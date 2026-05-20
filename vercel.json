@@ -6,26 +6,32 @@
   "env": {
     "DATABASE_URL": {
       "description": "Neon PostgreSQL connection string",
+      "type": "string",
       "required": true
     },
     "TWILIO_ACCOUNT_SID": {
       "description": "Twilio Account SID (starts with AC)",
+      "type": "string",
       "required": true
     },
     "TWILIO_AUTH_TOKEN": {
       "description": "Twilio Auth Token",
+      "type": "string",
       "required": true
     },
     "TWILIO_PHONE_NUMBER": {
       "description": "Your Twilio phone number",
+      "type": "string",
       "required": true
     },
     "JWT_SECRET": {
       "description": "Secret key for JWT token signing",
+      "type": "string",
       "required": true
     },
     "NEXT_PUBLIC_APP_URL": {
       "description": "Public app URL",
+      "type": "string",
       "required": false
     }
   }
