@@ -3,16 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface User {
-  id: string;
-  phoneNumber: string;
-  name: string | null;
-  email: string | null;
-}
-
 export default function FeedPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,10 +13,7 @@ export default function FeedPage() {
         const response = await fetch('/api/auth/me');
         if (!response.ok) {
           router.push('/login');
-          return;
         }
-        const data = await response.json();
-        setUser(data.user);
       } catch (error) {
         console.error('Auth check failed:', error);
         router.push('/login');
@@ -51,7 +40,6 @@ export default function FeedPage() {
     <main className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Feed</h1>
 
-      {/* New Post */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
         <div className="flex gap-4">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex-shrink-0"></div>
@@ -70,7 +58,6 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Empty Feed */}
       <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
         <h2 className="text-xl font-semibold text-gray-900 mb-2">
           Feed is Empty

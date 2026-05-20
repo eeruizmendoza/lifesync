@@ -64,7 +64,6 @@ export default function AppLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -73,28 +72,18 @@ export default function AppLayout({
                 LifeSync
               </Link>
               <nav className="hidden md:flex items-center gap-6">
-                <Link
-                  href="/inbox"
-                  className="text-gray-700 hover:text-gray-900 font-medium"
-                >
+                <Link href="/inbox" className="text-gray-700 hover:text-gray-900 font-medium">
                   Inbox
                 </Link>
-                <Link
-                  href="/feed"
-                  className="text-gray-700 hover:text-gray-900 font-medium"
-                >
+                <Link href="/feed" className="text-gray-700 hover:text-gray-900 font-medium">
                   Feed
                 </Link>
-                <Link
-                  href="/contacts"
-                  className="text-gray-700 hover:text-gray-900 font-medium"
-                >
+                <Link href="/contacts" className="text-gray-700 hover:text-gray-900 font-medium">
                   Contacts
                 </Link>
               </nav>
             </div>
 
-            {/* User Menu */}
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -108,19 +97,12 @@ export default function AppLayout({
                 </span>
               </button>
 
-              {/* Dropdown Menu */}
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-10">
-                  <Link
-                    href="/profile"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-t-lg"
-                  >
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-t-lg">
                     Profile
                   </Link>
-                  <Link
-                    href="/settings"
-                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                  >
+                  <Link href="/settings" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                     Settings
                   </Link>
                   <button
@@ -139,7 +121,6 @@ export default function AppLayout({
         </div>
       </header>
 
-      {/* Main Content */}
       {children}
     </div>
   );

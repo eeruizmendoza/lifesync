@@ -91,7 +91,6 @@ export default function ProfilePage() {
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Profile</h1>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
-        {/* Phone Number (Read-only) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Phone Number
@@ -107,7 +106,6 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        {/* Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Full Name
@@ -127,7 +125,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Email */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email Address
@@ -147,7 +144,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Messages */}
         {message && (
           <div
             className={`p-3 rounded-lg text-sm ${
@@ -160,7 +156,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Buttons */}
         <div className="flex gap-4">
           {!editing ? (
             <button
@@ -191,22 +186,6 @@ export default function ProfilePage() {
               </button>
             </>
           )}
-        </div>
-
-        {/* Account Info */}
-        <div className="pt-6 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h2>
-          <div className="space-y-2 text-sm text-gray-600">
-            <p>
-              <strong>Account ID:</strong> {user?.id}
-            </p>
-            <p>
-              <strong>Account Status:</strong> <span className="text-green-600">Active</span>
-            </p>
-            <p>
-              <strong>Privacy Setting:</strong> Private (by default)
-            </p>
-          </div>
         </div>
       </div>
     </main>

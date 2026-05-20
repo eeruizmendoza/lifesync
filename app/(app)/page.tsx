@@ -3,9 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-/**
- * App home page - redirects to inbox
- */
 export default function AppHome() {
   const router = useRouter();
 

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
            updated_at = NOW()
        WHERE id = $3
        RETURNING id, phone_number, name, email`,
-      [name, email, decoded.userId]
+      [name ?? null, email ?? null, decoded.userId]
     );
 
     if (!result.rows[0]) {
