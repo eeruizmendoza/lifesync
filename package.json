@@ -8,10 +8,16 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
     "test:e2e": "jest tests/e2e",
     "test:load": "jest tests/load",
     "test:security": "jest tests/security",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:all": "jest",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "setup-staging": "bash scripts/setup-staging.sh"
   },
   "dependencies": {
     "@deepgram/sdk": "^3.5.0",
@@ -45,9 +51,9 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@testing-library/react": "^16.0.0",
+    "@testing-library/react": "^16.3.2",
     "@types/bcrypt": "^6.0.0",
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -56,10 +62,10 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jest": "^29.7.0",
-    "jest-mock-extended": "^3.0.0",
-    "node-fetch": "^3.3.0",
+    "jest-mock-extended": "^3.0.7",
+    "node-fetch": "^3.3.2",
     "tailwindcss": "^4",
-    "ts-jest": "^29.1.0",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }
