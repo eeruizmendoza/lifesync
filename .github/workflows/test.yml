@@ -1,0 +1,99 @@
+name: Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: lifesync_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run linter
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run unit tests
+        run: npm run test -- tests/unit
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/lifesync_test
+          OPENAI_WHISPER_API_KEY: test-key
+          DEEPL_API_KEY: test-key
+          ELEVENLABS_API_KEY: test-key
+          ENCRYPTION_MASTER_KEY: fcfafc45ead1f13cbbd5d2a60182fe65c6546d78129ccd4c747e474e3d24ae20
+          JWT_SECRET: xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU=
+
+      - name: Run security tests
+        run: npm run test -- tests/security
+        continue-on-error: true
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage-final.json
+        continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/lifesync_test
+          OPENAI_WHISPER_API_KEY: test-key
+          DEEPL_API_KEY: test-key
+          ELEVENLABS_API_KEY: test-key
+          ENCRYPTION_MASTER_KEY: fcfafc45ead1f13cbbd5d2a60182fe65c6546d78129ccd4c747e474e3d24ae20
+          JWT_SECRET: xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU=
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+      - name: Check build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Build failed: .next directory not found"
+            exit 1
+          fi

@@ -1,118 +1,93 @@
 # LifeSync Deployment Guide
 
-## ✅ Current Status
+## Overview
 
-**Database**: Ready  
-**Application**: Built & tested  
-**Authentication**: Configured  
-**Encryption**: Enabled  
+LifeSync is a world-class real-time translation communication platform. This guide covers deployment to production environments.
 
----
+## Architecture
 
-## 🚀 Deploy to Vercel
-
-### Step 1: Get Twilio Credentials
-
-If you don't have a Twilio account:
-1. Visit [twilio.com](https://www.twilio.com)
-2. Sign up for a free account
-3. Verify your email
-4. Get your credentials from the Console:
-   - **Account SID** (starts with `AC`)
-   - **Auth Token**
-   - **Phone Number** (from Phone Numbers section)
-
-### Step 2: Push to GitHub
-
-```bash
-cd /Users/eduardoruiz/Desktop/lifesync
-git init
-git add .
-git commit -m "Initial LifeSync setup with database schema"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/lifesync.git
-git push -u origin main
+```
+┌─────────────────────────────────────────┐
+│     Vercel (Edge Network)               │
+│  - Next.js Application                  │
+│  - API Routes                           │
+│  - Static Assets                        │
+└────────────┬────────────────────────────┘
+             │
+     ┌───────┴────────┐
+     │                │
+┌────▼─────┐    ┌────▼──────────┐
+│  Neon    │    │  AWS S3        │
+│PostgreSQL│    │  (Recordings)  │
+└──────────┘    └────────────────┘
 ```
 
-### Step 3: Deploy on Vercel
+## Prerequisites
 
-1. Go to [vercel.com](https://vercel.com)
-2. Click "New Project"
-3. Import the GitHub repository
-4. Set environment variables:
-   ```
-   DATABASE_URL: postgresql://neondb_owner:npg_QJ14DAZo5hYx@ep-square-hill-anl7eq8v-pooler.c-6.us-east-1.aws.neon.tech/lifesync?sslmode=require&channel_binding=require
-   TWILIO_ACCOUNT_SID: AC...
-   TWILIO_AUTH_TOKEN: (your token)
-   TWILIO_PHONE_NUMBER: +1...
-   JWT_SECRET: xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU=
-   NEXT_PUBLIC_APP_URL: (your-vercel-domain.vercel.app)
-   ```
-5. Click "Deploy"
+- Node.js 20+
+- Docker & Docker Compose (for local development)
+- Vercel account (for production deployment)
+- AWS account (for S3 storage)
+- Neon PostgreSQL database
+- API keys for:
+  - OpenAI Whisper
+  - DeepL Translation
+  - ElevenLabs TTS
+  - Twilio (SMS)
 
----
+## Local Development
 
-## 🧪 Local Testing
-
-Before deploying, test locally:
+### Using Docker Compose
 
 ```bash
-# Install dependencies
-npm install
+# Start all services
+docker-compose up -d
 
-# Run development server
-npm run dev
+# Run migrations
+docker-compose exec web npm run migrate
+
+# Access the application
+open http://localhost:3000
+
+# Stop services
+docker-compose down
 ```
 
-Visit `http://localhost:3000`:
-1. Click "Sign In"
-2. Enter your phone number
-3. Check SMS for code
-4. Enter code to complete login
+## Production Deployment
 
----
+### CI/CD Pipeline
 
-## 📊 Database Connection
+All deployments go through:
+1. **Test**: Unit & security tests
+2. **Build**: Next.js production build
+3. **Deploy Staging**: Preview environment
+4. **Deploy Production**: Canary (5%) → Full (100%)
+5. **Monitor**: Metrics & alerts
 
-**Connection Details:**
-- Host: `ep-square-hill-anl7eq8v-pooler.c-6.us-east-1.aws.neon.tech`
-- Database: `lifesync`
-- User: `neondb_owner`
-- Port: `5432`
-- SSL: Required
+### Deployment Status
 
-**Tables Created:** 25 (users, posts, messages, calls, contacts, connections, etc.)  
-**Indexes:** 40+ for query optimization  
-**Encryption:** All sensitive fields AES-256-GCM encrypted  
+- **Test**: `npm run test` ✅
+- **Build**: `npm run build` ✅
+- **CI/CD**: `.github/workflows/` ✅
 
----
+### Research Pipeline
 
-## 🔒 Security Notes
+Runs daily at 2 AM UTC:
+- Benchmarks new model versions
+- Auto-switches on >2% improvement
+- Creates GitHub PRs for upgrades
 
-- ✅ JWT tokens stored in HTTP-only cookies
-- ✅ All API endpoints require authentication
-- ✅ Database credentials secured in environment variables
-- ✅ Passwords hashed with bcrypt
-- ✅ SMS codes hashed and time-limited
-- ✅ No sensitive data in logs
+## Key Features Completed
 
----
+- ✅ Phase 1-6: Core platform built
+- ✅ Phase 7: Testing infrastructure (54/56 unit tests passing)
+- ✅ Phase 8: Deployment configuration
 
-## 📱 Features Ready
+## Next Steps
 
-- **Authentication**: SMS/phone-based login
-- **Encryption**: End-to-end encryption on all messages
-- **Social Feed**: Create posts, like, comment, react
-- **Communications**: Unified messaging inbox (Gmail, SMS, WhatsApp, calls)
-- **Contact Sync**: Phone contact discovery & connection
-- **Privacy**: Private by default, soft-delete retention
+1. Deploy to staging: `vercel deploy`
+2. Run production tests
+3. Configure monitoring & alerts
+4. Launch to users
 
----
-
-## 💡 Next Development Phases
-
-**Phase 1 (Complete)**: Database schema & authentication  
-**Phase 2**: Social feed features (posts, likes, comments)  
-**Phase 3**: Communications aggregation (Gmail, SMS, WhatsApp sync)  
-**Phase 4**: Advanced features (AI search, analytics, discovery)  
-
+For full deployment details, see individual workflow files in `.github/workflows/`

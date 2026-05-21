@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: lifesync-postgres
+    environment:
+      POSTGRES_USER: lifesync
+      POSTGRES_PASSWORD: lifesync_dev_password
+      POSTGRES_DB: lifesync
+      POSTGRES_INITDB_ARGS: "-c max_connections=200"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifesync"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lifesync-network
+
+  # Next.js Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lifesync-web
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://lifesync:lifesync_dev_password@postgres:5432/lifesync
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # AI Model API Keys (use test keys for development)
+      OPENAI_WHISPER_API_KEY: ${OPENAI_WHISPER_API_KEY:-test-key}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-test-key}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-test-key}
+      # Encryption keys
+      ENCRYPTION_MASTER_KEY: fcfafc45ead1f13cbbd5d2a60182fe65c6546d78129ccd4c747e474e3d24ae20
+      JWT_SECRET: xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU=
+      RESEARCH_PIPELINE_CRON_SECRET: ${RESEARCH_PIPELINE_CRON_SECRET:-dev-secret}
+      # Twilio SMS (optional for development)
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-test}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-test}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-+15551234567}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - lifesync-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and real-time features (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: lifesync-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lifesync-network
+
+  # Adminer for database inspection
+  adminer:
+    image: adminer:latest
+    container_name: lifesync-adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    networks:
+      - lifesync-network
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  lifesync-network:
+    driver: bridge

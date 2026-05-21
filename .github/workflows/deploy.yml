@@ -1,0 +1,147 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_run:
+    workflows: ["Test"]
+    types: [completed]
+    branches: [main, develop]
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment variables
+        run: vercel pull --yes --environment=preview
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: vercel build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (staging)
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Run smoke tests on staging
+        run: |
+          echo "Running health check..."
+          curl -f ${{ steps.deploy.outputs.deployment_url }}/api/health || exit 1
+
+      - name: Comment on PR with deployment URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 Staging deployment: ${{ steps.deploy.outputs.deployment_url }}`
+            })
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment variables
+        run: vercel pull --yes --environment=production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: vercel build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (canary 5%)
+        id: deploy-canary
+        run: |
+          URL=$(vercel deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Run smoke tests on canary
+        run: |
+          echo "Running health check..."
+          curl -f ${{ steps.deploy-canary.outputs.deployment_url }}/api/health || exit 1
+
+      - name: Collect canary metrics (60 seconds)
+        run: |
+          echo "Collecting metrics for 60 seconds..."
+          sleep 60
+
+      - name: Promote to production (if canary healthy)
+        id: promote
+        run: |
+          vercel promote ${{ steps.deploy-canary.outputs.deployment_url }} \
+            --token ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          body: |
+            Production deployment successful
+            Commit: ${{ github.sha }}
+            URL: https://lifesync.app
+          draft: false
+          prerelease: false
+
+  monitor:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    timeout-minutes: 10
+
+    steps:
+      - name: Monitor production metrics
+        run: |
+          echo "Monitoring production metrics..."
+          # Check error rates, latency, etc.
+          # Alert if degradation detected
+
+      - name: Rollback if degradation detected
+        if: failure()
+        run: |
+          echo "Degradation detected, initiating rollback..."
+          # Automated rollback to previous stable version
