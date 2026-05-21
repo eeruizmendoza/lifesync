@@ -106,31 +106,133 @@ export async function getActiveModel(
  * Check if a model is responding and healthy
  */
 export async function checkModelHealth(modelName: string): Promise<ModelStatus> {
+  const startTime = Date.now();
+
   try {
-    // TODO: Implement health checks for each provider
-    // - OpenAI: Call /models endpoint
-    // - DeepL: Call simple translation endpoint
-    // - ElevenLabs: Call voice list endpoint
-    // - Meta: GitHub releases API
+    let isHealthy = false;
+
+    // Provider-specific health checks
+    if (modelName.includes('whisper')) {
+      isHealthy = await checkOpenAIHealth();
+    } else if (modelName.includes('deepl')) {
+      isHealthy = await checkDeepLHealth();
+    } else if (modelName.includes('elevenlabs')) {
+      isHealthy = await checkElevenLabsHealth();
+    } else if (modelName.includes('seamless')) {
+      isHealthy = await checkMetaHealth();
+    } else if (modelName.includes('deepgram')) {
+      isHealthy = await checkDeepgramHealth();
+    } else {
+      // Default to healthy if unknown
+      isHealthy = true;
+    }
+
+    const latencyMs = Date.now() - startTime;
 
     return {
       model: modelName,
-      isHealthy: true,
+      isHealthy,
       lastCheckedAt: new Date(),
-      errorRate: 0,
-      latencyMs: 100,
+      errorRate: isHealthy ? 0 : 1.0,
+      latencyMs,
       costPerUnit: 0.01,
     };
   } catch (error) {
     console.error(`Health check failed for ${modelName}:`, error);
+    const latencyMs = Date.now() - startTime;
+
     return {
       model: modelName,
       isHealthy: false,
       lastCheckedAt: new Date(),
       errorRate: 1.0,
-      latencyMs: 5000,
+      latencyMs,
       costPerUnit: 0,
     };
+  }
+}
+
+/**
+ * Check OpenAI API health
+ */
+async function checkOpenAIHealth(): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_WHISPER_API_KEY}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check DeepL API health
+ */
+async function checkDeepLHealth(): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.deepl.com/v2/languages', {
+      headers: {
+        'Authorization': `DeepAuthKey ${process.env.DEEPL_API_KEY}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check ElevenLabs API health
+ */
+async function checkElevenLabsHealth(): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.elevenlabs.io/v1/models', {
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY || '',
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check Meta Seamless availability
+ */
+async function checkMetaHealth(): Promise<boolean> {
+  try {
+    // For self-hosted Seamless, check local endpoint
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch('http://localhost:8080/health', {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch {
+    // Seamless is self-hosted, so assume healthy if we can reach it locally
+    return false;
+  }
+}
+
+/**
+ * Check Deepgram API health
+ */
+async function checkDeepgramHealth(): Promise<boolean> {
+  try {
+    const response = await fetch('https://api.deepgram.com/v1/status', {
+      headers: {
+        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+      },
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
