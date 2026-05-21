@@ -1,6 +1,8 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "framework": "nextjs"
+  "crons": [
+    {
+      "path": "/api/research-pipeline/run",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }
