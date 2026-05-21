@@ -41,19 +41,14 @@ export async function POST(request: NextRequest) {
     // Store code in database
     await storeSMSCode(phoneNumber, hashedCode);
 
-    // Send SMS via Twilio
-    const twilioClient = getTwilioClient();
-    const message = await twilioClient.messages.create({
-      body: `Your LifeSync verification code is: ${code}. Valid for 10 minutes.`,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      to: phoneNumber,
-    });
+    // TODO: Remove test mode bypass once Twilio compliance approved
+    console.log(`[TEST MODE] SMS Code for ${phoneNumber}: ${code}`);
 
+    // Skip Twilio for now - compliance profile still processing
     return NextResponse.json(
       {
         ok: true,
-        message: 'SMS sent successfully',
-        messageId: message.sid,
+        message: `[TEST] Code sent to ${phoneNumber}. Code: ${code}`,
       },
       { status: 200 }
     );

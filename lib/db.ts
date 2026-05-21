@@ -32,4 +32,7 @@ export async function getClient() {
   return pool.connect();
 }
 
+// Default export for backward compatibility
+export const db = { query };
+
 export default pool;

@@ -126,3 +126,88 @@ export async function verifySMSCode(
 
   return { valid: true, message: 'Code verified' };
 }
+
+/**
+ * Middleware for API routes and server components
+ * For API routes: const user = await requireAuth(request);
+ * For server components: const user = await requireAuth();
+ * Throws error if not authenticated
+ */
+export async function requireAuth(
+  request?: Request,
+  options?: { adminOnly?: boolean }
+): Promise<{ id: string; phoneNumber: string }> {
+  let authHeader: string | null = null;
+
+  if (request) {
+    // API route context - extract from Request object
+    authHeader = request.headers.get('authorization');
+  } else {
+    // Server component context - use Next.js headers()
+    try {
+      const { headers } = await import('next/headers');
+      const headersList = await headers();
+      authHeader = headersList.get('authorization');
+    } catch (error) {
+      // Fallback for development/testing
+      authHeader = null;
+    }
+  }
+
+  if (!authHeader) {
+    throw new Error('Missing authorization header');
+  }
+
+  // Extract Bearer token
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    throw new Error('Invalid authorization header format');
+  }
+
+  const token = parts[1];
+  const verified = verifyToken(token);
+
+  if (!verified) {
+    throw new Error('Invalid or expired token');
+  }
+
+  // Check admin status if required
+  if (options?.adminOnly) {
+    // TODO: Implement admin check - for now allow all authenticated users
+    // In production, check user.isAdmin flag in database
+  }
+
+  return {
+    id: verified.userId,
+    phoneNumber: verified.phoneNumber,
+  };
+}
+
+/**
+ * Verify auth from Authorization header
+ * @param authHeader - The Authorization header value (e.g., "Bearer token123")
+ */
+export async function verifyAuth(authHeader?: string): Promise<{ id: string; phoneNumber: string } | null> {
+  if (!authHeader) {
+    return null;
+  }
+
+  // Extract Bearer token
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return null;
+  }
+
+  const token = parts[1];
+  const verified = verifyToken(token);
+
+  if (!verified) {
+    return null;
+  }
+
+  // Return user object compatible with expected interface
+  return {
+    id: verified.userId,
+    phoneNumber: verified.phoneNumber,
+  };
+}
