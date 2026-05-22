@@ -1,16 +1,16 @@
 import { requireAuth } from '@/lib/auth';
-import { ContactsList } from '@/components/portal/contacts/ContactsList';
+import { ContactsPageTabs } from '@/components/portal/contacts/ContactsPageTabs';
 import { InviteButton } from '@/components/portal/InviteButton';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Contacts | LifeSync',
-  description: 'Browse and call people on LifeSync',
+  description: 'Browse platform users and manage your external contact book',
 };
 
 export default async function ContactsPage() {
-  await requireAuth();
+  const user = await requireAuth();
 
   return (
     <div className="space-y-6">
@@ -18,12 +18,12 @@ export default async function ContactsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
           <p className="mt-1 text-gray-600">
-            Browse people on LifeSync and start a translated call
+            Platform users you can call and your external contact book
           </p>
         </div>
         <InviteButton />
       </div>
-      <ContactsList />
+      <ContactsPageTabs hasOrg={!!user?.orgId} />
     </div>
   );
 }
