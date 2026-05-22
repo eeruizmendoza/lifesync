@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { requireAdminRole } from '@/lib/tenant-middleware';
+import { logAuditEvent } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,15 @@ export async function DELETE(
     if (result.length === 0) {
       return NextResponse.json({ error: 'Key not found or already revoked' }, { status: 404 });
     }
+
+    // Audit log
+    logAuditEvent({
+      orgId: user.orgId,
+      actorId: user.id,
+      eventType: 'api_key.revoked',
+      targetType: 'api_key',
+      targetId: id,
+    }).catch(() => {});
 
     return NextResponse.json({ ok: true, revokedAt: new Date().toISOString() });
   } catch (err) {

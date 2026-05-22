@@ -12,6 +12,7 @@ import { acceptOrgInvite, getInviteByToken, getOrganizationById } from '@/lib/da
 import { neon } from '@neondatabase/serverless';
 import { sendNotificationEmail } from '@/lib/email-service';
 import { deliverWebhookEvent } from '@/lib/webhook-service';
+import { logAuditEvent } from '@/lib/audit-log';
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,6 +73,16 @@ export async function POST(req: NextRequest) {
         }).catch(() => {});
       }
     } catch { /* non-fatal */ }
+
+    // Audit log
+    logAuditEvent({
+      orgId: invite.orgId,
+      actorId: user.id,
+      actorName: String(row?.name ?? row?.phone_number ?? 'Unknown'),
+      eventType: 'member.joined',
+      targetType: 'member',
+      targetId: user.id,
+    }).catch(() => {});
 
     // Webhook: member.joined (non-blocking)
     deliverWebhookEvent(invite.orgId, 'member.joined', {

@@ -11,6 +11,7 @@ import { requireAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { requireAdminRole } from '@/lib/tenant-middleware';
+import { logAuditEvent } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,6 +143,16 @@ export async function POST(req: NextRequest) {
       )
       RETURNING id, url, description, events, is_active, created_at
     `;
+
+    // Audit log
+    logAuditEvent({
+      orgId: user.orgId,
+      actorId: user.id,
+      eventType: 'webhook.created',
+      targetType: 'webhook',
+      targetId: String(newEndpoint.id),
+      targetName: parsedUrl.toString(),
+    }).catch(() => {});
 
     return NextResponse.json({
       ok: true,

@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { requireAdminRole } from '@/lib/tenant-middleware';
+import { logAuditEvent } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,16 @@ export async function POST(req: NextRequest) {
       )
       RETURNING id, name, key_prefix, expires_at, created_at
     `;
+
+    // Audit log (non-blocking)
+    logAuditEvent({
+      orgId: user.orgId,
+      actorId: user.id,
+      eventType: 'api_key.created',
+      targetType: 'api_key',
+      targetId: String(newKey.id),
+      targetName: name.trim(),
+    }).catch(() => {});
 
     // Return full key ONCE — never stored, never retrievable again
     return NextResponse.json({

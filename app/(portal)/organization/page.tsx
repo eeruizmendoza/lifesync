@@ -2,6 +2,7 @@ import React from 'react';
 import { requireAuth } from '@/lib/auth';
 import { OrganizationSettings } from '@/components/portal/org/OrganizationSettings';
 import { OrgAnalytics } from '@/components/portal/org/OrgAnalytics';
+import { AuditLog } from '@/components/portal/org/AuditLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,9 @@ export default async function OrganizationPage() {
       <OrgAnalytics />
 
       <OrganizationSettings userId={user.id} orgId={user.orgId ?? null} />
+
+      {/* Security audit log — only visible to admins/owners (component self-hides on 403) */}
+      <AuditLog />
     </div>
   );
 }
