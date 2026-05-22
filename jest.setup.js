@@ -34,7 +34,7 @@ global.testConfig = {
   apiTimeout: 5000,
 }
 
-// Mock fetch for integration tests
+// Mock fetch for integration tests (but allow API calls to pass through)
 const originalFetch = global.fetch
 
 global.fetch = async (input, init) => {
@@ -43,12 +43,19 @@ global.fetch = async (input, init) => {
     return originalFetch(input, init)
   }
 
-  // Convert relative URLs to absolute for testing
+  // Allow API calls to pass through for testing
+  if (typeof input === 'string' && input.startsWith('/api/')) {
+    // For API calls, return a mock response or pass through
+    // In test environment, we want real API responses for integration tests
+    return originalFetch(`http://localhost:3000${input}`, init)
+  }
+
+  // For other relative URLs, convert to absolute
   const url = typeof input === 'string'
     ? `http://localhost:3000${input}`
     : input
 
-  // Return mock response for tests
+  // Return mock response for non-API tests
   return new Response(JSON.stringify({ error: 'Test mode' }), {
     status: 404,
     headers: { 'Content-Type': 'application/json' },
