@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { query } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,11 +30,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Invalid or expired token' }, { status: 401 });
     }
 
+    // Fetch name + email from DB (JWT only carries userId/phoneNumber/orgId)
+    let name: string | null = null;
+    let email: string | null = null;
+    try {
+      const result = await query(
+        'SELECT name, email FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+      if (result.rows[0]) {
+        name = result.rows[0].name ?? null;
+        email = result.rows[0].email ?? null;
+      }
+    } catch {
+      // Non-fatal — DB down or user not found; return without profile fields
+    }
+
     return NextResponse.json({
       ok: true,
       user: {
         id: decoded.userId,
         phoneNumber: decoded.phoneNumber,
+        name,
+        email,
         orgId: decoded.orgId ?? null,
       },
     });

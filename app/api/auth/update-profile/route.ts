@@ -15,17 +15,23 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const token = request.cookies.get('lifesync_token')?.value;
+    // Accept Bearer token (portal localStorage) OR cookie (SSR login flow)
+    let rawToken: string | undefined;
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      rawToken = authHeader.slice(7);
+    } else {
+      rawToken = request.cookies.get('lifesync_token')?.value;
+    }
 
-    if (!token) {
+    if (!rawToken) {
       return NextResponse.json(
         { ok: false, error: 'Not authenticated' },
         { status: 401 }
       );
     }
 
-    const decoded = verifyToken(token);
+    const decoded = verifyToken(rawToken);
 
     if (!decoded) {
       return NextResponse.json(

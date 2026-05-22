@@ -180,6 +180,84 @@ export async function listUserRecordings(
 }
 
 /**
+ * List ALL recordings for a user across all conversations (global view)
+ */
+export async function getAllUserRecordings(
+  userId: string,
+  orgId: string | null | undefined,
+  limit: number = 20,
+  offset: number = 0
+): Promise<{ recordings: ConversationRecordingMetadata[]; total: number }> {
+  try {
+    const orgFilter = orgId ? 'AND org_id = $3' : '';
+    const params: (string | number)[] = orgId
+      ? [userId, limit, orgId, offset]
+      : [userId, limit, offset];
+
+    // Shift offset param index based on whether orgId is present
+    const offsetIndex = orgId ? '$4' : '$3';
+
+    const countResult = await db.query(
+      `SELECT COUNT(*) as total
+       FROM call_recordings
+       WHERE (caller_id::text = $1 OR receiver_id::text = $1 OR user_id::text = $1)
+         ${orgFilter}
+         AND deleted_at IS NULL`,
+      orgId ? [userId, orgId] : [userId]
+    );
+
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    const result = await db.query(
+      `SELECT
+        id,
+        COALESCE(conversation_id::text, call_id) AS conversation_id,
+        COALESCE(user_id::text, caller_id::text) AS user_id,
+        COALESCE(recording_type, 'audio')        AS recording_type,
+        COALESCE(mime_type, 'audio/webm')        AS mime_type,
+        COALESCE(file_size_bytes, original_size, 0)   AS file_size_bytes,
+        COALESCE(duration_seconds, duration_ms::decimal / 1000, 0) AS duration_seconds,
+        COALESCE(is_encrypted, true)             AS is_encrypted,
+        COALESCE(encryption_algorithm, 'XChaCha20-Poly1305') AS encryption_algorithm,
+        COALESCE(processing_status, 'pending')   AS processing_status,
+        COALESCE(transcription_status, 'pending') AS transcription_status,
+        COALESCE(s3_key, s3_path, '')            AS s3_key,
+        created_at,
+        updated_at
+       FROM call_recordings
+       WHERE (caller_id::text = $1 OR receiver_id::text = $1 OR user_id::text = $1)
+         ${orgFilter}
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET ${offsetIndex}`,
+      params
+    );
+
+    const recordings: ConversationRecordingMetadata[] = result.rows.map(row => ({
+      id: row.id,
+      conversationId: row.conversation_id,
+      userId: row.user_id,
+      recordingType: row.recording_type,
+      mimeType: row.mime_type,
+      fileSizeBytes: parseInt(row.file_size_bytes, 10),
+      durationSeconds: parseFloat(row.duration_seconds),
+      isEncrypted: row.is_encrypted,
+      encryptionAlgorithm: row.encryption_algorithm,
+      processingStatus: row.processing_status,
+      transcriptionStatus: row.transcription_status,
+      s3Key: row.s3_key,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }));
+
+    return { recordings, total };
+  } catch (error) {
+    console.error('Failed to list all recordings:', error);
+    throw error;
+  }
+}
+
+/**
  * Create recording metadata.
  * Uses the Phase 5 columns (added in migration 031) plus the original
  * schema columns (caller_id, receiver_id, recording_id, start_time).

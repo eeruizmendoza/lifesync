@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   MessageSquare,
+  Settings,
+  Mic,
 } from 'lucide-react';
 
 interface User {
@@ -23,8 +25,10 @@ interface User {
 
 const NAV_LINKS = [
   { href: '/communications', label: 'Communications', icon: Phone },
+  { href: '/recordings',     label: 'Recordings',     icon: Mic },
   { href: '/organization',   label: 'Organization',   icon: Building2 },
   { href: '/billing',        label: 'Billing & Plan',  icon: CreditCard },
+  { href: '/settings',       label: 'Settings',       icon: Settings },
 ];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
