@@ -15,8 +15,11 @@ import {
   hasOrgRole,
   listOrgMembers,
   getOrganizationById,
+  getOrgMember,
 } from '@/lib/database/organizations';
 import type { OrgMember } from '@/lib/database/organizations';
+import { sendOrgInviteEmail } from '@/lib/email-service';
+import { neon } from '@neondatabase/serverless';
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,8 +75,23 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lifesync.app';
     const inviteUrl = `${appUrl}/invite/${invite.token}`;
 
-    // TODO: Send invite email via SendGrid/Resend (Phase 3.5)
-    console.info(`[orgs/invites] Invite created for ${email} → ${inviteUrl}`);
+    // Fetch inviter's display name for the email
+    const sql = neon(process.env.DATABASE_URL!);
+    const [inviterRow] = await sql`SELECT name FROM users WHERE id = ${user.id}::uuid`;
+    const inviterName = inviterRow?.name ?? 'A teammate';
+
+    // Send invite email (fire-and-forget — non-blocking, don't fail the request if email fails)
+    if (process.env.RESEND_API_KEY) {
+      sendOrgInviteEmail({
+        toEmail: email,
+        orgName: org?.name ?? 'your organization',
+        inviterName,
+        role,
+        inviteToken: invite.token,
+      }).catch(err => console.error('[orgs/invites] Email send failed (non-fatal):', err));
+    } else {
+      console.info(`[orgs/invites] Invite created for ${email} → ${inviteUrl} (RESEND_API_KEY not set — email not sent)`);
+    }
 
     return NextResponse.json({ invite, inviteUrl }, { status: 201 });
   } catch (err) {
