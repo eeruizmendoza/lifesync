@@ -285,7 +285,13 @@ function TimelineCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function ContactTimeline({ contactId }: { contactId: string }) {
+export function ContactTimeline({
+  contactId,
+  refreshKey,
+}: {
+  contactId: string;
+  refreshKey?: number;
+}) {
   const [items, setItems]               = useState<TimelineItem[]>([]);
   const [total, setTotal]               = useState(0);
   const [loading, setLoading]           = useState(true);
@@ -332,11 +338,12 @@ export function ContactTimeline({ contactId }: { contactId: string }) {
     }
   }, [contactId]);
 
-  // Initial load
+  // Initial load + refresh when refreshKey changes (e.g. after sending a message)
   useEffect(() => {
     setOffset(0);
     fetchTimeline(0, channel, true);
-  }, [contactId, channel, fetchTimeline]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactId, channel, fetchTimeline, refreshKey]);
 
   const handleChannelChange = (ch: string) => {
     setChannel(ch);

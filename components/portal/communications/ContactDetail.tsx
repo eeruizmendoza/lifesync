@@ -14,6 +14,7 @@ import {
   Languages, Tag, Plus, X, Save, Check, Building2, FileText, Pin, PinOff,
 } from 'lucide-react';
 import { ContactTimeline } from '@/components/portal/contacts/ContactTimeline';
+import { ChatInput } from '@/components/portal/contacts/ChatInput';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -251,6 +252,7 @@ export function ContactDetail({ contactId }: { contactId: string }) {
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [timelineKey, setTimelineKey] = useState(0);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
@@ -437,10 +439,19 @@ export function ContactDetail({ contactId }: { contactId: string }) {
         onSaved={updated => setContact(prev => prev ? { ...prev, ...updated } : prev)}
       />
 
+      {/* In-app chat input */}
+      <ChatInput
+        receiverUserId={contact.id}
+        receiverName={contact.name ?? 'Contact'}
+        userLanguage={contact.language ?? 'en'}
+        receiverLanguage={contact.language ?? 'en'}
+        onMessageSent={() => setTimelineKey(k => k + 1)}
+      />
+
       {/* Unified timeline — all channels */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <ContactTimeline contactId={contactId} />
+        <div className="px-5 py-4">
+          <ContactTimeline contactId={contactId} refreshKey={timelineKey} />
         </div>
       </div>
     </div>
