@@ -9,6 +9,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Send, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
+import { VoiceMessageButton } from './VoiceMessageButton';
 
 interface ChatInputProps {
   receiverUserId: string;
@@ -136,6 +137,13 @@ export function ChatInput({
               ? <Loader2 size={16} className="animate-spin" />
               : <Send size={16} />}
           </button>
+          <VoiceMessageButton
+            receiverUserId={receiverUserId}
+            receiverName={receiverName}
+            userLanguage={userLanguage}
+            receiverLanguage={receiverLanguage}
+            onMessageSent={onMessageSent}
+          />
         </div>
 
         {/* Error */}

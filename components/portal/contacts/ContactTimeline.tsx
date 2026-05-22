@@ -270,12 +270,23 @@ function TimelineCard({
           </a>
         )}
 
-        {/* Voice message player placeholder */}
+        {/* Voice message player */}
         {item.kind === 'voice_message' && (
-          <div className="mt-2 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-            <Mic2 size={14} className="text-orange-500" />
-            <div className="flex-1 h-1.5 bg-orange-200 rounded-full" />
-            <span className="text-xs text-orange-600">{formatDuration(item.durationSeconds)}</span>
+          <div className="mt-2">
+            {item.mediaUrl ? (
+              <audio
+                src={item.mediaUrl}
+                controls
+                className="w-full h-8 max-w-xs"
+                style={{ accentColor: '#f97316' }}
+              />
+            ) : (
+              <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                <Mic2 size={14} className="text-orange-500" />
+                <div className="flex-1 h-1.5 bg-orange-200 rounded-full" />
+                <span className="text-xs text-orange-600">{formatDuration(item.durationSeconds)}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
