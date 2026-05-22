@@ -1,13 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MessageSquare, ArrowRight, RotateCcw } from 'lucide-react';
 
 type Step = 'phone' | 'code';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || null;
   const [step, setStep] = useState<Step>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [code, setCode] = useState('');
@@ -55,8 +57,10 @@ export default function LoginPage() {
         localStorage.setItem('auth_token', data.token);
       }
 
-      // Route based on whether user already has an org
-      if (data.user?.orgId) {
+      // If came from an invite link or other redirect, honor it
+      if (redirectTo && redirectTo.startsWith('/')) {
+        router.push(redirectTo);
+      } else if (data.user?.orgId) {
         router.push('/communications');
       } else {
         router.push('/onboarding');
@@ -170,5 +174,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
