@@ -11,6 +11,7 @@ import { requireAuth, createToken } from '@/lib/auth';
 import { acceptOrgInvite, getInviteByToken, getOrganizationById } from '@/lib/database/organizations';
 import { neon } from '@neondatabase/serverless';
 import { sendNotificationEmail } from '@/lib/email-service';
+import { deliverWebhookEvent } from '@/lib/webhook-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,6 +72,14 @@ export async function POST(req: NextRequest) {
         }).catch(() => {});
       }
     } catch { /* non-fatal */ }
+
+    // Webhook: member.joined (non-blocking)
+    deliverWebhookEvent(invite.orgId, 'member.joined', {
+      userId: user.id,
+      orgId: invite.orgId,
+      inviteToken: token,
+      joinedAt: new Date().toISOString(),
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, org, token: newToken });
   } catch (err) {

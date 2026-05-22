@@ -11,6 +11,7 @@ import { getRealtimePipeline } from '@/lib/realtime-pipeline';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry } from '@/lib/call-state-machine';
 import { db } from '@/lib/db';
+import { deliverWebhookEvent } from '@/lib/webhook-service';
 
 interface EndCallRequest {
   callId: string;
@@ -156,6 +157,17 @@ export async function POST(request: NextRequest) {
 
     // Remove call from registry (cleanup)
     registry.removeCall(callId);
+
+    // Fire webhook event (non-blocking)
+    if (user.orgId) {
+      deliverWebhookEvent(user.orgId, 'call.completed', {
+        callId,
+        userId,
+        durationMs: duration,
+        durationSeconds: Math.floor(duration / 1000),
+        endedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     console.log(`📞 Call ended: ${callId}`);
     console.log(`   Duration: ${(duration / 1000).toFixed(1)}s`);

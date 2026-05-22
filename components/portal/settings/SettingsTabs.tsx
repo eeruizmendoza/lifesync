@@ -14,6 +14,7 @@ import { User, Shield, Code2 } from 'lucide-react';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
 import { ApiKeyManager } from './ApiKeyManager';
+import { WebhookManager } from './WebhookManager';
 
 type Tab = 'profile' | 'account' | 'developer';
 
@@ -49,7 +50,14 @@ export function SettingsTabs() {
       {/* Tab content */}
       {active === 'profile'   && <ProfileSettings />}
       {active === 'account'   && <AccountSettings />}
-      {active === 'developer' && <ApiKeyManager />}
+      {active === 'developer' && (
+        <div className="space-y-8">
+          <ApiKeyManager />
+          <div className="border-t border-gray-100 pt-6">
+            <WebhookManager />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

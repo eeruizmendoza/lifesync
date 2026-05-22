@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { uploadRecordingToS3, generatePresignedDownloadUrl } from '@/lib/s3-service';
+import { deliverWebhookEvent } from '@/lib/webhook-service';
 import {
   createRecordingMetadata,
   getUserStorageUsage,
@@ -202,6 +203,20 @@ export async function POST(request: NextRequest) {
     }).catch((err) => {
       console.error(`Failed to trigger process-recording job for ${recordingId}:`, err);
     });
+
+    // Fire webhook: recording.ready (non-blocking)
+    if (user.orgId) {
+      deliverWebhookEvent(user.orgId, 'recording.ready', {
+        recordingId,
+        callId,
+        conversationId,
+        recordingType,
+        mimeType,
+        fileSizeBytes,
+        durationSeconds: durationSeconds || null,
+        uploadedAt: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
