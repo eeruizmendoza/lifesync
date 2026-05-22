@@ -37,20 +37,25 @@ export interface S3DownloadResult {
 
 /**
  * Generate encrypted S3 key to prevent metadata leakage
- * Instead of: recordings/user123/conversation456/recording.wav
- * We use: recordings/a7f3e2c1d5b9f8a2b4e6c8d0f2a4b6c8.encrypted
  *
- * The real metadata is stored in database only
+ * Phase 3 (multi-tenant): prefix with org hash for per-tenant S3 namespace.
+ * Pattern: recordings/{orgHash}/{hash}-{uuid}.encrypted
+ *   where orgHash = first 8 chars of SHA-256(orgId) — opaque, no PII in S3
+ *
+ * Single-tenant fallback: recordings/{hash}-{uuid}.encrypted
  */
-function generateEncryptedS3Key(userId: string, conversationId: string): string {
-  // Create deterministic hash of user+conversation for organization (but encrypted)
+function generateEncryptedS3Key(userId: string, conversationId: string, orgId?: string | null): string {
   const hash = createHash('sha256')
     .update(`${userId}:${conversationId}`)
     .digest('hex')
     .substring(0, 16);
 
-  // Use UUID for actual filename (no user/conv info exposed)
   const filename = `${hash}-${uuid()}`;
+
+  if (orgId) {
+    const orgHash = createHash('sha256').update(orgId).digest('hex').substring(0, 8);
+    return `recordings/${orgHash}/${filename}.encrypted`;
+  }
 
   return `recordings/${filename}.encrypted`;
 }
@@ -73,7 +78,8 @@ export async function uploadRecordingToS3(
   metadata: {
     filename: string;
     mimeType: string;
-  }
+  },
+  orgId?: string | null
 ): Promise<S3UploadResult> {
   try {
     // Encrypt file in chunks
@@ -83,8 +89,8 @@ export async function uploadRecordingToS3(
     const encryptedContent = JSON.stringify(encryptedFile);
     const encryptedBuffer = Buffer.from(encryptedContent, 'utf-8');
 
-    // Generate encrypted S3 key (no user/conversation info exposed)
-    const s3Key = generateEncryptedS3Key(userId, conversationId);
+    // Phase 3: per-tenant S3 namespace
+    const s3Key = generateEncryptedS3Key(userId, conversationId, orgId);
 
     // Upload to S3
     const params = {
@@ -234,12 +240,13 @@ export function generatePresignedDownloadUrl(
 export async function generatePresignedUploadUrl(
   userId: string,
   conversationId: string,
-  contentType: string
+  contentType: string,
+  orgId?: string | null
 ): Promise<{
   url: string;
   fields: Record<string, string>;
 }> {
-  const s3Key = generateEncryptedS3Key(userId, conversationId);
+  const s3Key = generateEncryptedS3Key(userId, conversationId, orgId);
 
   return new Promise((resolve, reject) => {
     s3.createPresignedPost(
