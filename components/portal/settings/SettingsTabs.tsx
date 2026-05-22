@@ -5,19 +5,22 @@
  * Tabbed settings UI with:
  *   - Profile: name, email, phone (existing ProfileSettings)
  *   - Account: danger zone (sign out all sessions, account deletion request)
+ *   - Developer: API key management for integrations
  * Renders client-side so tabs switch without page reload.
  */
 
 import { useState } from 'react';
-import { User, Shield } from 'lucide-react';
+import { User, Shield, Code2 } from 'lucide-react';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
+import { ApiKeyManager } from './ApiKeyManager';
 
-type Tab = 'profile' | 'account';
+type Tab = 'profile' | 'account' | 'developer';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'profile',  label: 'Profile',  icon: <User size={16} /> },
-  { id: 'account',  label: 'Account',  icon: <Shield size={16} /> },
+  { id: 'profile',   label: 'Profile',    icon: <User size={16} /> },
+  { id: 'account',   label: 'Account',    icon: <Shield size={16} /> },
+  { id: 'developer', label: 'Developer',  icon: <Code2 size={16} /> },
 ];
 
 export function SettingsTabs() {
@@ -44,8 +47,9 @@ export function SettingsTabs() {
       </div>
 
       {/* Tab content */}
-      {active === 'profile'  && <ProfileSettings />}
-      {active === 'account'  && <AccountSettings />}
+      {active === 'profile'   && <ProfileSettings />}
+      {active === 'account'   && <AccountSettings />}
+      {active === 'developer' && <ApiKeyManager />}
     </div>
   );
 }
