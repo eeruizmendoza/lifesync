@@ -1,15 +1,22 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, SyntheticEvent } from 'react';
 import { Play, Pause, Download } from 'lucide-react';
 import type { Recording, RecordingPlayerProps } from '@/lib/types/calls';
 
 export function RecordingPlayer({ recording }: RecordingPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+
+  // Sync playback rate to audio element whenever it changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
 
   const handlePlayPause = async () => {
     if (!audioRef.current) return;
@@ -42,9 +49,12 @@ export function RecordingPlayer({ recording }: RecordingPlayerProps) {
         src={`/api/recordings/${recording.id}/stream`}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onPlaybackRateChange={(e) => setPlaybackRate(e.currentTarget.playbackRate)}
+        onTimeUpdate={(e: SyntheticEvent<HTMLAudioElement>) =>
+          setCurrentTime(e.currentTarget.currentTime)
+        }
+        onLoadedMetadata={(e: SyntheticEvent<HTMLAudioElement>) =>
+          setDuration(e.currentTarget.duration)
+        }
       />
 
       {/* Controls */}

@@ -159,22 +159,26 @@ export type CallAction =
 
 // Component Props
 export interface PhoneCallDialogProps {
+  callId?: string;
   contactId: string;
   contactName: string;
   contactPhone: string;
   sourceLanguage: string;
   targetLanguage: string;
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onEnd?: () => void;
 }
 
 export interface VideoCallDialogProps {
+  callId?: string;
   contactId: string;
   contactName: string;
   sourceLanguage: string;
   targetLanguage: string;
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onEnd?: () => void;
 }
 
 export interface RealTimeTranscriptProps {

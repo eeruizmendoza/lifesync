@@ -14,6 +14,7 @@ export function VideoCallDialog({
   targetLanguage,
   isOpen,
   onClose,
+  onEnd,
 }: VideoCallDialogProps) {
   const { state, endCall } = useCallContext();
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -136,7 +137,7 @@ export function VideoCallDialog({
           <button
             onClick={() => {
               endCall();
-              onClose();
+              (onClose ?? onEnd)?.();
             }}
             className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition"
             title="End call"

@@ -16,6 +16,7 @@ export function PhoneCallDialog({
   targetLanguage,
   isOpen,
   onClose,
+  onEnd,
 }: PhoneCallDialogProps) {
   const { state, initiateCall, answerCall, rejectCall, endCall, mute, unmute } = useCallContext();
   const [isMuted, setIsMuted] = useState(false);
@@ -69,7 +70,7 @@ export function PhoneCallDialog({
       setAnnouncementShown(true);
       // Delay announcement to allow call to connect
       const timer = setTimeout(() => {
-        announcement.show(state.callId, userState, sourceLanguage);
+        announcement.show(state.callId ?? '', userState, sourceLanguage);
       }, 500);
 
       return () => clearTimeout(timer);
@@ -107,7 +108,7 @@ export function PhoneCallDialog({
     console.log(`❌ Recording consent declined for call ${state.callId}`);
     rejectCall();
     announcement.close();
-    onClose();
+    (onClose ?? onEnd)?.();
   };
 
   return (
@@ -152,7 +153,7 @@ export function PhoneCallDialog({
               <CallTimer className="flex justify-center text-green-600 font-bold text-lg mt-2" />
             </>
           )}
-          {state.callState === 'on-hold' && (
+          {state.callState === 'hold' && (
             <p className="text-sm font-medium text-yellow-600">On hold</p>
           )}
           {state.callState === 'failed' && (
@@ -175,7 +176,7 @@ export function PhoneCallDialog({
               <button
                 onClick={() => {
                   rejectCall();
-                  onClose();
+                  (onClose ?? onEnd)?.();
                 }}
                 className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-lg"
                 title="Reject"
@@ -220,7 +221,7 @@ export function PhoneCallDialog({
               <button
                 onClick={() => {
                   endCall();
-                  onClose();
+                  (onClose ?? onEnd)?.();
                 }}
                 className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-lg"
                 title="End call"
@@ -233,7 +234,7 @@ export function PhoneCallDialog({
           {state.callState === 'failed' && (
             <button
               onClick={() => {
-                onClose();
+                (onClose ?? onEnd)?.();
               }}
               className="flex h-12 px-6 items-center justify-center rounded-full bg-gray-500 text-white hover:bg-gray-600 transition font-medium"
             >
