@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Phone, Video, Search, Users, Globe, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { Phone, Video, Search, Users, Globe, Mail, AlertCircle, Loader2, Tag } from 'lucide-react';
 import Link from 'next/link';
 
 interface Contact {
@@ -14,6 +14,8 @@ interface Contact {
   isOnline: boolean;
   isRecent?: boolean;
   lastSeenAt?: number | null;
+  tags?: string[];
+  company?: string | null;
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -21,6 +23,35 @@ const LANGUAGE_LABELS: Record<string, string> = {
   it: 'Italian', pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese',
   ko: 'Korean', ar: 'Arabic', ru: 'Russian', hi: 'Hindi',
   nl: 'Dutch', pl: 'Polish', tr: 'Turkish', sv: 'Swedish',
+};
+
+const PREDEFINED_TAGS = [
+  'Adjuster', 'Homeowner', 'Contractor', 'Subcontractor',
+  'Insurance', 'Supplier', 'Property Manager', 'Other',
+];
+
+// Tag color: background class for chips
+const TAG_COLORS: Record<string, string> = {
+  Adjuster:         'bg-blue-100 text-blue-700',
+  Homeowner:        'bg-green-100 text-green-700',
+  Contractor:       'bg-orange-100 text-orange-700',
+  Subcontractor:    'bg-amber-100 text-amber-700',
+  Insurance:        'bg-purple-100 text-purple-700',
+  Supplier:         'bg-teal-100 text-teal-700',
+  'Property Manager': 'bg-indigo-100 text-indigo-700',
+  Other:            'bg-gray-100 text-gray-600',
+};
+
+// Active filter pill color (darker / filled)
+const TAG_ACTIVE_COLORS: Record<string, string> = {
+  Adjuster:         'bg-blue-600 text-white',
+  Homeowner:        'bg-green-600 text-white',
+  Contractor:       'bg-orange-600 text-white',
+  Subcontractor:    'bg-amber-500 text-white',
+  Insurance:        'bg-purple-600 text-white',
+  Supplier:         'bg-teal-600 text-white',
+  'Property Manager': 'bg-indigo-600 text-white',
+  Other:            'bg-gray-600 text-white',
 };
 
 function getInitials(name: string): string {
@@ -50,6 +81,7 @@ export function ContactsList() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string>('');
   const [offset, setOffset] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LIMIT = 24;
@@ -59,12 +91,13 @@ export function ContactsList() {
       ? localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
       : null) ?? '';
 
-  const fetchContacts = useCallback(async (q: string, off: number, append = false) => {
+  const fetchContacts = useCallback(async (q: string, tag: string, off: number, append = false) => {
     if (!append) setLoading(true);
     else setLoadingMore(true);
     setError(null);
     try {
       const params = new URLSearchParams({ search: q, limit: String(LIMIT), offset: String(off) });
+      if (tag) params.set('tag', tag);
       const res = await fetch(`/api/users/contacts?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
@@ -85,28 +118,34 @@ export function ContactsList() {
   }, []);
 
   // Initial load
-  useEffect(() => { fetchContacts('', 0, false); }, [fetchContacts]);
+  useEffect(() => { fetchContacts('', '', 0, false); }, [fetchContacts]);
 
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setOffset(0);
-      fetchContacts(search, 0, false);
+      fetchContacts(search, selectedTag, 0, false);
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [search, fetchContacts]);
+  }, [search, selectedTag, fetchContacts]);
 
   const loadMore = () => {
     const newOffset = offset + LIMIT;
     setOffset(newOffset);
-    fetchContacts(search, newOffset, true);
+    fetchContacts(search, selectedTag, newOffset, true);
+  };
+
+  const handleTagSelect = (tag: string) => {
+    const next = selectedTag === tag ? '' : tag;
+    setSelectedTag(next);
+    setOffset(0);
   };
 
   const hasMore = contacts.length < total;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Search bar */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -119,12 +158,44 @@ export function ContactsList() {
         />
       </div>
 
+      {/* Tag filter strip */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+        {/* All pill */}
+        <button
+          onClick={() => handleTagSelect('')}
+          className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            selectedTag === ''
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          <Users size={11} />
+          All
+        </button>
+        {PREDEFINED_TAGS.map(tag => (
+          <button
+            key={tag}
+            onClick={() => handleTagSelect(tag)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              selectedTag === tag
+                ? TAG_ACTIVE_COLORS[tag] ?? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Tag size={10} />
+            {tag}
+          </button>
+        ))}
+      </div>
+
       {/* Count */}
       {!loading && !error && (
         <p className="text-sm text-gray-500">
           {total === 0
-            ? 'No contacts found'
-            : `${total} contact${total !== 1 ? 's' : ''} on LifeSync`}
+            ? selectedTag
+              ? `No contacts tagged "${selectedTag}"`
+              : 'No contacts found'
+            : `${total} contact${total !== 1 ? 's' : ''}${selectedTag ? ` tagged "${selectedTag}"` : ' on LifeSync'}`}
         </p>
       )}
 
@@ -152,7 +223,7 @@ export function ContactsList() {
           <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
           <button
-            onClick={() => fetchContacts(search, 0, false)}
+            onClick={() => fetchContacts(search, selectedTag, 0, false)}
             className="ml-auto text-xs text-red-600 font-medium hover:underline"
           >
             Retry
@@ -168,21 +239,35 @@ export function ContactsList() {
           </div>
           <div>
             <h3 className="text-base font-semibold text-gray-900">
-              {search ? 'No contacts match your search' : 'No contacts yet'}
+              {search
+                ? 'No contacts match your search'
+                : selectedTag
+                  ? `No contacts tagged "${selectedTag}"`
+                  : 'No contacts yet'}
             </h3>
             <p className="text-sm text-gray-500 mt-1 max-w-xs">
               {search
                 ? 'Try a different name, email, or phone number.'
-                : 'Invite teammates from your Organization settings to start communicating.'}
+                : selectedTag
+                  ? 'Open a contact and add this tag in the detail view.'
+                  : 'Invite teammates from your Organization settings to start communicating.'}
             </p>
           </div>
-          {!search && (
+          {!search && !selectedTag && (
             <Link
               href="/organization"
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors"
             >
               Go to Organization
             </Link>
+          )}
+          {selectedTag && (
+            <button
+              onClick={() => setSelectedTag('')}
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Clear filter
+            </button>
           )}
         </div>
       )}
@@ -198,48 +283,74 @@ export function ContactsList() {
               >
                 {/* Clickable name/avatar area → contact detail */}
                 <Link href={`/contacts/${contact.id}`} className="block -mx-1 px-1 -mt-1 pt-1 rounded-lg hover:bg-gray-50 transition-colors mb-1">
-                <div className="flex items-start gap-3">
-                  {/* Avatar with presence dot */}
-                  <div className="relative flex-shrink-0">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColor(contact.id)} flex items-center justify-center text-white text-sm font-semibold`}>
-                      {getInitials(contact.name)}
-                    </div>
-                    {contact.isOnline && (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" title="Online" />
-                    )}
-                    {!contact.isOnline && contact.isRecent && (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white" title="Recently active" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    {/* Name */}
-                    <p className="font-semibold text-gray-900 truncate text-sm">{contact.name}</p>
-
-                    {/* Phone or email */}
-                    {contact.phone ? (
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{contact.phone}</p>
-                    ) : contact.email ? (
-                      <p className="text-xs text-gray-500 truncate mt-0.5">{contact.email}</p>
-                    ) : null}
-
-                    {/* Language tag + presence label */}
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <div className="flex items-center gap-1">
-                        <Globe size={11} className="text-gray-400" />
-                        <span className="text-xs text-gray-400">
-                          {LANGUAGE_LABELS[contact.language] ?? contact.language.toUpperCase()}
-                        </span>
+                  <div className="flex items-start gap-3">
+                    {/* Avatar with presence dot */}
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColor(contact.id)} flex items-center justify-center text-white text-sm font-semibold`}>
+                        {getInitials(contact.name)}
                       </div>
                       {contact.isOnline && (
-                        <span className="text-xs text-green-600 font-medium">● Online</span>
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" title="Online" />
                       )}
                       {!contact.isOnline && contact.isRecent && (
-                        <span className="text-xs text-yellow-600">Recently active</span>
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white" title="Recently active" />
                       )}
                     </div>
+
+                    <div className="flex-1 min-w-0">
+                      {/* Name */}
+                      <p className="font-semibold text-gray-900 truncate text-sm">{contact.name}</p>
+
+                      {/* Company (if set) */}
+                      {contact.company && (
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{contact.company}</p>
+                      )}
+
+                      {/* Phone or email */}
+                      {!contact.company && contact.phone ? (
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{contact.phone}</p>
+                      ) : !contact.company && contact.email ? (
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{contact.email}</p>
+                      ) : null}
+
+                      {/* Language tag + presence label */}
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <Globe size={11} className="text-gray-400" />
+                          <span className="text-xs text-gray-400">
+                            {LANGUAGE_LABELS[contact.language] ?? contact.language.toUpperCase()}
+                          </span>
+                        </div>
+                        {contact.isOnline && (
+                          <span className="text-xs text-green-600 font-medium">● Online</span>
+                        )}
+                        {!contact.isOnline && contact.isRecent && (
+                          <span className="text-xs text-yellow-600">Recently active</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Tag chips (top 3) */}
+                  {contact.tags && contact.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2.5">
+                      {contact.tags.slice(0, 3).map(tag => (
+                        <span
+                          key={tag}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            TAG_COLORS[tag] ?? 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {contact.tags.length > 3 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-500">
+                          +{contact.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </Link>
 
                 {/* Actions */}

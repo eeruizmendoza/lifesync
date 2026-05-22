@@ -5,11 +5,14 @@
  *
  * Query params:
  *   search  - optional text filter on name, email, or phone
+ *   tag     - optional tag filter (e.g. "Adjuster", "Contractor")
  *   limit   - default 50
  *   offset  - default 0
  *
  * Response:
  *   { contacts: Contact[], total: number }
+ *   Contact includes: id, name, phone, email, avatar, language,
+ *                     isOnline, isRecent, lastSeenAt, tags, company
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -32,6 +35,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
+    const tag = searchParams.get('tag') || '';
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -41,40 +45,55 @@ export async function GET(request: NextRequest) {
 
     const rows = await sql`
       SELECT
-        id,
-        name,
-        phone_number AS phone,
-        email,
-        avatar_url AS avatar,
-        language_preference AS language,
-        last_seen_at,
-        CASE WHEN private THEN false ELSE true END AS is_visible
-      FROM users
+        u.id,
+        u.name,
+        u.phone_number AS phone,
+        u.email,
+        u.avatar_url AS avatar,
+        u.language_preference AS language,
+        u.last_seen_at,
+        COALESCE(c.tags, '{}') AS tags,
+        c.company
+      FROM users u
+      LEFT JOIN contacts c
+        ON c.user_id = ${user.id}::uuid
+        AND c.contact_user_id = u.id
       WHERE
-        id::text != ${user.id}
-        AND (private IS NULL OR private = false)
+        u.id::text != ${user.id}
+        AND (u.private IS NULL OR u.private = false)
         AND (
           ${search} = ''
-          OR name ILIKE ${searchPattern}
-          OR email ILIKE ${searchPattern}
-          OR phone_number ILIKE ${searchPattern}
+          OR u.name ILIKE ${searchPattern}
+          OR u.email ILIKE ${searchPattern}
+          OR u.phone_number ILIKE ${searchPattern}
         )
-      ORDER BY last_seen_at DESC NULLS LAST, name ASC
+        AND (
+          ${tag} = ''
+          OR ${tag} = ANY(COALESCE(c.tags, '{}'::text[]))
+        )
+      ORDER BY u.last_seen_at DESC NULLS LAST, u.name ASC
       LIMIT ${limit}
       OFFSET ${offset}
     `;
 
     const countRow = await sql`
       SELECT COUNT(*) AS total
-      FROM users
+      FROM users u
+      LEFT JOIN contacts c
+        ON c.user_id = ${user.id}::uuid
+        AND c.contact_user_id = u.id
       WHERE
-        id::text != ${user.id}
-        AND (private IS NULL OR private = false)
+        u.id::text != ${user.id}
+        AND (u.private IS NULL OR u.private = false)
         AND (
           ${search} = ''
-          OR name ILIKE ${searchPattern}
-          OR email ILIKE ${searchPattern}
-          OR phone_number ILIKE ${searchPattern}
+          OR u.name ILIKE ${searchPattern}
+          OR u.email ILIKE ${searchPattern}
+          OR u.phone_number ILIKE ${searchPattern}
+        )
+        AND (
+          ${tag} = ''
+          OR ${tag} = ANY(COALESCE(c.tags, '{}'::text[]))
         )
     `;
 
@@ -85,7 +104,7 @@ export async function GET(request: NextRequest) {
       const isOnline = secondsAgo !== null && secondsAgo < 90;           // seen in last 90s
       const isRecent = secondsAgo !== null && secondsAgo < 3600 * 4;    // seen in last 4h
       return {
-        id: r.id,
+        id: String(r.id),
         name: r.name || r.email?.split('@')[0] || 'Unknown',
         phone: r.phone || '',
         email: r.email || '',
@@ -94,6 +113,8 @@ export async function GET(request: NextRequest) {
         isOnline,
         isRecent,
         lastSeenAt: lastSeen,
+        tags: (r.tags as string[]) ?? [],
+        company: r.company ? String(r.company) : null,
       };
     });
 
