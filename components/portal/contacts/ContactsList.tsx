@@ -12,6 +12,8 @@ interface Contact {
   avatar: string | null;
   language: string;
   isOnline: boolean;
+  isRecent?: boolean;
+  lastSeenAt?: number | null;
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -195,9 +197,17 @@ export function ContactsList() {
                 className="bg-white rounded-xl border border-gray-100 p-4 hover:border-blue-200 hover:shadow-sm transition-all"
               >
                 <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColor(contact.id)} flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}>
-                    {getInitials(contact.name)}
+                  {/* Avatar with presence dot */}
+                  <div className="relative flex-shrink-0">
+                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarColor(contact.id)} flex items-center justify-center text-white text-sm font-semibold`}>
+                      {getInitials(contact.name)}
+                    </div>
+                    {contact.isOnline && (
+                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" title="Online" />
+                    )}
+                    {!contact.isOnline && contact.isRecent && (
+                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-yellow-400 border-2 border-white" title="Recently active" />
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -211,12 +221,20 @@ export function ContactsList() {
                       <p className="text-xs text-gray-500 truncate mt-0.5">{contact.email}</p>
                     ) : null}
 
-                    {/* Language tag */}
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <Globe size={11} className="text-gray-400" />
-                      <span className="text-xs text-gray-400">
-                        {LANGUAGE_LABELS[contact.language] ?? contact.language.toUpperCase()}
-                      </span>
+                    {/* Language tag + presence label */}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <Globe size={11} className="text-gray-400" />
+                        <span className="text-xs text-gray-400">
+                          {LANGUAGE_LABELS[contact.language] ?? contact.language.toUpperCase()}
+                        </span>
+                      </div>
+                      {contact.isOnline && (
+                        <span className="text-xs text-green-600 font-medium">● Online</span>
+                      )}
+                      {!contact.isOnline && contact.isRecent && (
+                        <span className="text-xs text-yellow-600">Recently active</span>
+                      )}
                     </div>
                   </div>
                 </div>

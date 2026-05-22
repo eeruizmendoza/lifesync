@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
         email,
         avatar_url AS avatar,
         language_preference AS language,
+        last_seen_at,
         CASE WHEN private THEN false ELSE true END AS is_visible
       FROM users
       WHERE
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
           OR email ILIKE ${searchPattern}
           OR phone_number ILIKE ${searchPattern}
         )
-      ORDER BY name ASC
+      ORDER BY last_seen_at DESC NULLS LAST, name ASC
       LIMIT ${limit}
       OFFSET ${offset}
     `;
@@ -77,15 +78,24 @@ export async function GET(request: NextRequest) {
         )
     `;
 
-    const contacts = rows.map((r: any) => ({
-      id: r.id,
-      name: r.name || r.email?.split('@')[0] || 'Unknown',
-      phone: r.phone || '',
-      email: r.email || '',
-      avatar: r.avatar || null,
-      language: r.language || 'en',
-      isOnline: false, // real-time presence is a future feature
-    }));
+    const now = Date.now();
+    const contacts = rows.map((r: any) => {
+      const lastSeen = r.last_seen_at ? new Date(r.last_seen_at).getTime() : null;
+      const secondsAgo = lastSeen ? Math.floor((now - lastSeen) / 1000) : null;
+      const isOnline = secondsAgo !== null && secondsAgo < 90;           // seen in last 90s
+      const isRecent = secondsAgo !== null && secondsAgo < 3600 * 4;    // seen in last 4h
+      return {
+        id: r.id,
+        name: r.name || r.email?.split('@')[0] || 'Unknown',
+        phone: r.phone || '',
+        email: r.email || '',
+        avatar: r.avatar || null,
+        language: r.language || 'en',
+        isOnline,
+        isRecent,
+        lastSeenAt: lastSeen,
+      };
+    });
 
     return NextResponse.json({
       contacts,

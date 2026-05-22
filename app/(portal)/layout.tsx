@@ -67,6 +67,22 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       .catch(() => { router.push('/login'); });
   }, [router]);
 
+  // Presence heartbeat — update last_seen_at every 60 seconds
+  useEffect(() => {
+    const pingPresence = () => {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+      if (!token) return;
+      fetch('/api/auth/presence', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      }).catch(() => { /* ignore */ });
+    };
+    pingPresence(); // immediate ping on mount
+    const interval = setInterval(pingPresence, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = async () => {
     const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
     await fetch('/api/auth/logout', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} });
