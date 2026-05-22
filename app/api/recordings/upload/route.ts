@@ -34,6 +34,7 @@ import {
   getUserStorageUsage,
   logRecordingAccess,
 } from '@/lib/database/recordings';
+import { requireOrgContext } from '@/lib/tenant-middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
     const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Phase 3: enforce org storage quota before accepting upload
+    if (user.orgId) {
+      const { quotaError } = await requireOrgContext(user, { checkQuotas: true, resource: 'storage' });
+      if (quotaError) return quotaError;
     }
 
     // 2. Parse request

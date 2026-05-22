@@ -11,6 +11,7 @@ import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry, CallStateContext } from '@/lib/call-state-machine';
 import { getRecordingAnnouncementService } from '@/lib/recording-announcement-service';
 import { db } from '@/lib/db';
+import { requireOrgContext, recordCallUsage } from '@/lib/tenant-middleware';
 
 interface InitiateCallRequest {
   contactId: string; // UUID of person being called
@@ -60,6 +61,12 @@ export async function POST(request: NextRequest) {
     const caller = await verifyAuthWithTestSupport(authHeader);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Phase 3: enforce org quota before initiating call
+    if (caller.orgId) {
+      const { quotaError } = await requireOrgContext(caller, { checkQuotas: true, resource: 'calls' });
+      if (quotaError) return quotaError;
     }
 
     // Parse request
@@ -188,6 +195,11 @@ export async function POST(request: NextRequest) {
         isTwoPartyConsent,
       },
     };
+
+    // Phase 3: record usage for quota tracking
+    if (caller.orgId) {
+      recordCallUsage(caller.orgId); // fire-and-forget, non-blocking
+    }
 
     console.log(`📞 Call initiated: ${callId} (${caller.id} → ${contactId})`);
     console.log(`   Languages: ${sourceLanguage} → ${targetLanguage}`);

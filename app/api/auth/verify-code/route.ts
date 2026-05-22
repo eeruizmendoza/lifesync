@@ -11,6 +11,7 @@ import {
   createUser,
   createToken,
 } from '@/lib/auth';
+import { getUserOrganization } from '@/lib/database/organizations';
 
 const schema = z.object({
   phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
@@ -42,8 +43,11 @@ export async function POST(request: NextRequest) {
       user = await createUser(phoneNumber, name, email);
     }
 
-    // Create JWT token
-    const token = createToken(user.id, phoneNumber);
+    // Resolve org for JWT so all subsequent API calls have tenant context
+    const org = await getUserOrganization(user.id).catch(() => null);
+
+    // Create JWT token (Phase 3: includes orgId)
+    const token = createToken(user.id, phoneNumber, org?.id ?? null);
 
     // Set secure HTTP-only cookie
     const response = NextResponse.json(
