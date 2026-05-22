@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { OrganizationSettings } from '@/components/portal/org/OrganizationSettings';
 import { OrgAnalytics } from '@/components/portal/org/OrgAnalytics';
 import { AuditLog } from '@/components/portal/org/AuditLog';
+import { MemberDirectory } from '@/components/portal/org/MemberDirectory';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,9 @@ export default async function OrganizationPage() {
       <OrgAnalytics />
 
       <OrganizationSettings userId={user.id} orgId={user.orgId ?? null} />
+
+      {/* Team directory — searchable member grid with call stats (self-hides when no org) */}
+      <MemberDirectory />
 
       {/* Security audit log — only visible to admins/owners (component self-hides on 403) */}
       <AuditLog />
