@@ -196,6 +196,8 @@ export function ContactsList() {
                 key={contact.id}
                 className="bg-white rounded-xl border border-gray-100 p-4 hover:border-blue-200 hover:shadow-sm transition-all"
               >
+                {/* Clickable name/avatar area → contact detail */}
+                <Link href={`/contacts/${contact.id}`} className="block -mx-1 px-1 -mt-1 pt-1 rounded-lg hover:bg-gray-50 transition-colors mb-1">
                 <div className="flex items-start gap-3">
                   {/* Avatar with presence dot */}
                   <div className="relative flex-shrink-0">
@@ -238,6 +240,7 @@ export function ContactsList() {
                     </div>
                   </div>
                 </div>
+                </Link>
 
                 {/* Actions */}
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
