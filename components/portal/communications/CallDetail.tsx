@@ -20,6 +20,9 @@ import {
   FileText,
   Download,
   Languages,
+  NotebookPen,
+  CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -37,6 +40,7 @@ interface CallInfo {
   callerPhone: string;
   callerId: string;
   contactId: string | null;
+  notes: string | null;
   createdAt: string;
 }
 
@@ -115,6 +119,13 @@ export function CallDetail({ callId }: { callId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
 
+  // Notes state
+  const [notes, setNotes] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const notesSaveTimer = useState<ReturnType<typeof setTimeout> | null>(null);
+
   const fetchDetail = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -130,6 +141,7 @@ export function CallDetail({ callId }: { callId: string }) {
       }
       const data = await res.json();
       setCall(data.call);
+      setNotes(data.call?.notes ?? '');
       setRecordings(data.recordings ?? []);
       setTranscriptLines(data.transcriptLines ?? []);
     } catch (e) {
@@ -140,6 +152,31 @@ export function CallDetail({ callId }: { callId: string }) {
   }, [callId]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  const saveNotes = useCallback(async (value: string) => {
+    setNotesSaving(true);
+    setNotesSaved(false);
+    setNotesError(null);
+    const token = getToken();
+    try {
+      const res = await fetch(`/api/calls/${callId}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ notes: value || null }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2500);
+    } catch {
+      setNotesError('Could not save notes. Please try again.');
+    } finally {
+      setNotesSaving(false);
+    }
+  }, [callId]);
 
   const handleDownload = async (recordingId: string, mimeType: string) => {
     const token = getToken();
@@ -254,6 +291,54 @@ export function CallDetail({ callId }: { callId: string }) {
             <p className="text-xs text-gray-400 mb-1 flex items-center gap-1"><Languages size={11} />Their language</p>
             <p className="text-sm font-medium text-gray-800">{langLabel(call.contactLanguage)}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Call Notes */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <NotebookPen size={15} className="text-blue-500" />
+            Call Notes
+          </h3>
+          <div className="flex items-center gap-2 h-6">
+            {notesSaving && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <Loader2 size={12} className="animate-spin" /> Saving…
+              </span>
+            )}
+            {notesSaved && !notesSaving && (
+              <span className="flex items-center gap-1 text-xs text-green-600">
+                <CheckCircle2 size={12} /> Saved
+              </span>
+            )}
+            {notesError && !notesSaving && (
+              <span className="text-xs text-red-500">{notesError}</span>
+            )}
+          </div>
+        </div>
+        <textarea
+          value={notes}
+          onChange={e => {
+            setNotes(e.target.value);
+            setNotesSaved(false);
+            setNotesError(null);
+          }}
+          onBlur={() => saveNotes(notes)}
+          placeholder="Add follow-up notes, action items, or CRM remarks…"
+          rows={4}
+          maxLength={4000}
+          className="w-full text-sm text-gray-800 placeholder-gray-400 border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+        />
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-gray-400">{notes.length}/4000 characters</p>
+          <button
+            onClick={() => saveNotes(notes)}
+            disabled={notesSaving}
+            className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            Save notes
+          </button>
         </div>
       </div>
 

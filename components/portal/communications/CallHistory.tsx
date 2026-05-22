@@ -15,6 +15,7 @@ import {
   AlertCircle,
   PhoneMissed,
   ChevronRight as ArrowRight,
+  NotebookPen,
 } from 'lucide-react';
 
 interface CallRecord {
@@ -26,6 +27,7 @@ interface CallRecord {
   durationSeconds: number;
   contactPhone: string | null;
   contactName: string | null;
+  hasNotes?: boolean;
   createdAt: string;
 }
 
@@ -230,6 +232,11 @@ export function CallHistory() {
                     <span className="text-xs text-gray-400 flex-shrink-0">
                       {call.type === 'video_call' ? 'Video' : 'Phone'}
                     </span>
+                    {call.hasNotes && (
+                      <span title="Has notes" className="flex-shrink-0">
+                        <NotebookPen size={12} className="text-blue-400" />
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-0.5">
                     <span className="flex items-center gap-1 text-xs text-gray-400">

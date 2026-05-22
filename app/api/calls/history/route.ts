@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
           c.contact_phone,
           c.created_at,
           c.updated_at,
+          (c.notes IS NOT NULL AND c.notes <> '') AS has_notes,
           -- Join contact user details if they're in the system
           u.name    AS contact_name,
           u.phone_number AS contact_phone_number
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
       durationSeconds: Number(row.duration_seconds ?? 0),
       contactPhone: row.contact_phone ? String(row.contact_phone) : (row.contact_phone_number ? String(row.contact_phone_number) : null),
       contactName: row.contact_name ? String(row.contact_name) : null,
+      hasNotes: Boolean(row.has_notes),
       createdAt: new Date(String(row.created_at)).toISOString(),
       updatedAt: new Date(String(row.updated_at)).toISOString(),
     }));
