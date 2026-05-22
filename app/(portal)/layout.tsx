@@ -15,6 +15,7 @@ import {
   Mic,
   ShieldCheck,
   History,
+  Users,
 } from 'lucide-react';
 
 interface User {
@@ -28,6 +29,7 @@ interface User {
 
 const NAV_LINKS = [
   { href: '/communications', label: 'Communications', icon: Phone },
+  { href: '/contacts',       label: 'Contacts',       icon: Users },
   { href: '/calls',          label: 'Call History',   icon: History },
   { href: '/recordings',     label: 'Recordings',     icon: Mic },
   { href: '/organization',   label: 'Organization',   icon: Building2 },
