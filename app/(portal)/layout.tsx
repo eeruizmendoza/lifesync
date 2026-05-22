@@ -22,6 +22,7 @@ import { IncomingCallBanner } from '@/components/portal/communications/IncomingC
 import { TrialBanner } from '@/components/portal/TrialBanner';
 import { InviteButton } from '@/components/portal/InviteButton';
 import { NotificationsBell } from '@/components/portal/notifications/NotificationsBell';
+import { GlobalSearch } from '@/components/portal/search/GlobalSearch';
 
 interface User {
   id: string;
@@ -135,6 +136,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </button>
         </div>
 
+        {/* Search */}
+        <div className="px-3 py-2 border-b border-gray-100">
+          <GlobalSearch />
+        </div>
+
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV_LINKS.map(({ href, label, icon: Icon }) => {
@@ -227,14 +233,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
+        <header className="md:hidden flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-10">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg flex-shrink-0"
           >
             <Menu size={20} />
           </button>
-          <span className="text-lg font-bold text-gray-900 flex-1">LifeSync</span>
+          <span className="text-lg font-bold text-gray-900 flex-shrink-0">LifeSync</span>
+          <div className="flex-1" />
           <NotificationsBell />
         </header>
 
