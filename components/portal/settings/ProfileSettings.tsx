@@ -12,6 +12,8 @@ interface UserProfile {
   language: string | null;
   notificationCalls: boolean;
   notificationInvites: boolean;
+  notificationQuota: boolean;
+  notificationDigest: boolean;
 }
 
 const LANGUAGES = [
@@ -44,6 +46,8 @@ export function ProfileSettings() {
   const [language, setLanguage] = useState('en');
   const [notifCalls, setNotifCalls] = useState(true);
   const [notifInvites, setNotifInvites] = useState(true);
+  const [notifQuota, setNotifQuota] = useState(true);
+  const [notifDigest, setNotifDigest] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -69,6 +73,8 @@ export function ProfileSettings() {
           setLanguage(data.user.language ?? 'en');
           setNotifCalls(data.user.notificationCalls ?? true);
           setNotifInvites(data.user.notificationInvites ?? true);
+          setNotifQuota(data.user.notificationQuota ?? true);
+          setNotifDigest(data.user.notificationDigest ?? true);
         }
       })
       .catch(() => setError('Failed to load profile'))
@@ -94,6 +100,8 @@ export function ProfileSettings() {
           language: language || 'en',
           notificationCalls: notifCalls,
           notificationInvites: notifInvites,
+          notificationQuota: notifQuota,
+          notificationDigest: notifDigest,
         }),
       });
       const data = await res.json();
@@ -109,6 +117,8 @@ export function ProfileSettings() {
         language: data.user.language,
         notificationCalls: data.user.notificationCalls ?? true,
         notificationInvites: data.user.notificationInvites ?? true,
+        notificationQuota: data.user.notificationQuota ?? true,
+        notificationDigest: data.user.notificationDigest ?? true,
       } : prev);
       setTimeout(() => setSuccess(false), 3000);
     } catch {
@@ -123,7 +133,9 @@ export function ProfileSettings() {
     email.trim() !== (profile?.email ?? '') ||
     language !== (profile?.language ?? 'en') ||
     notifCalls !== (profile?.notificationCalls ?? true) ||
-    notifInvites !== (profile?.notificationInvites ?? true);
+    notifInvites !== (profile?.notificationInvites ?? true) ||
+    notifQuota !== (profile?.notificationQuota ?? true) ||
+    notifDigest !== (profile?.notificationDigest ?? true);
 
   if (loading) {
     return (
@@ -254,6 +266,36 @@ export function ProfileSettings() {
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${notifInvites ? 'bg-blue-600' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifInvites ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </label>
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="text-sm text-gray-800 font-medium">Quota Warnings</p>
+                <p className="text-xs text-gray-400">Email when org reaches 80% or 100% of plan limits</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifQuota}
+                onClick={() => { setNotifQuota(v => !v); setError(''); setSuccess(false); }}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${notifQuota ? 'bg-blue-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifQuota ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </label>
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="text-sm text-gray-800 font-medium">Weekly Digest</p>
+                <p className="text-xs text-gray-400">Monday morning summary of org activity (admins only)</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifDigest}
+                onClick={() => { setNotifDigest(v => !v); setError(''); setSuccess(false); }}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${notifDigest ? 'bg-blue-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifDigest ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
             </label>
           </div>

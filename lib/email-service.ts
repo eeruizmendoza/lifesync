@@ -158,7 +158,7 @@ export async function sendNotificationEmail(
     const sql = neon(process.env.DATABASE_URL!);
 
     const [user] = await sql`
-      SELECT email, notification_calls, notification_invites
+      SELECT email, notification_calls, notification_invites, notification_quota, notification_digest
       FROM users
       WHERE id = ${userId}::uuid
     `;
@@ -167,7 +167,7 @@ export async function sendNotificationEmail(
     // Respect per-type prefs
     if (type === 'missed_call' && user.notification_calls === false) return;
     if (type === 'member_joined' && user.notification_invites === false) return;
-    // quota_warning always sent (business-critical)
+    if (type === 'quota_warning' && user.notification_quota === false) return;
 
     const resend = getResend();
     let subject: string;

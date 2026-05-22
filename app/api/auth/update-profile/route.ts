@@ -19,6 +19,8 @@ const schema = z.object({
     .nullable(),
   notificationCalls: z.boolean().optional(),
   notificationInvites: z.boolean().optional(),
+  notificationQuota: z.boolean().optional(),
+  notificationDigest: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { name, email, language, notificationCalls, notificationInvites } = schema.parse(body);
+    const { name, email, language, notificationCalls, notificationInvites, notificationQuota, notificationDigest } = schema.parse(body);
 
     // Update user profile
     const result = await query(
@@ -60,11 +62,15 @@ export async function POST(request: NextRequest) {
            language_preference = COALESCE($3, language_preference),
            notification_calls = COALESCE($4, notification_calls),
            notification_invites = COALESCE($5, notification_invites),
+           notification_quota = COALESCE($6, notification_quota),
+           notification_digest = COALESCE($7, notification_digest),
            updated_at = NOW()
-       WHERE id = $6
-       RETURNING id, phone_number, name, email, language_preference, notification_calls, notification_invites`,
+       WHERE id = $8
+       RETURNING id, phone_number, name, email, language_preference, notification_calls, notification_invites, notification_quota, notification_digest`,
       [name ?? null, email ?? null, language ?? null,
-       notificationCalls ?? null, notificationInvites ?? null, decoded.userId]
+       notificationCalls ?? null, notificationInvites ?? null,
+       notificationQuota ?? null, notificationDigest ?? null,
+       decoded.userId]
     );
 
     if (!result.rows[0]) {
@@ -88,6 +94,8 @@ export async function POST(request: NextRequest) {
           language: updatedUser.language_preference ?? 'en',
           notificationCalls: updatedUser.notification_calls ?? true,
           notificationInvites: updatedUser.notification_invites ?? true,
+          notificationQuota: updatedUser.notification_quota ?? true,
+          notificationDigest: updatedUser.notification_digest ?? true,
         },
       },
       { status: 200 }

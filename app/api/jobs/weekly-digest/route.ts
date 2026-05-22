@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
           AND om.role IN ('admin', 'owner')
           AND u.email IS NOT NULL
           AND u.email != ''
+          AND (u.notification_digest IS NULL OR u.notification_digest = TRUE)
       `;
 
       for (const admin of admins) {
