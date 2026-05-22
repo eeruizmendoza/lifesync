@@ -87,9 +87,10 @@ export class CallStateMachine {
     }
 
     // Additional validation for specific transitions
+    // When transitioning to 'connected', allow from: connecting, reconnecting, or hold (resume)
     if (toState === 'connected' && !this.context.connectedAt) {
-      // Allow connecting -> connected transition
-      if (currentState !== 'connecting' && currentState !== 'reconnecting') {
+      // First connection must come from connecting or reconnecting states
+      if (currentState !== 'connecting' && currentState !== 'reconnecting' && currentState !== 'hold') {
         return {
           from: currentState,
           to: toState,
@@ -97,6 +98,16 @@ export class CallStateMachine {
           reason: 'Cannot connect from current state without proper handshake',
         };
       }
+    }
+
+    // Also allow 'connected' transitions when resuming from hold (connectedAt already set)
+    if (toState === 'connected' && this.context.connectedAt && currentState === 'hold') {
+      // This is a valid resume operation
+      return {
+        from: currentState,
+        to: toState,
+        isValid: true,
+      };
     }
 
     if (toState === 'ended' && !this.context.endedAt) {
