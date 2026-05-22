@@ -10,16 +10,11 @@ export const metadata = {
 
 export default function HomePage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Home</h1>
-        <p className="mt-1 text-gray-600">Your translation call command center</p>
-      </div>
-
-      {/* Onboarding checklist (auto-hides when complete) */}
+    <div className="space-y-5">
+      {/* Onboarding checklist (auto-hides when all steps complete) */}
       <DashboardWidget />
 
-      {/* Main dashboard content */}
+      {/* Main dashboard — greeting + Room Mode CTA + activity feed */}
       <Dashboard />
     </div>
   );
