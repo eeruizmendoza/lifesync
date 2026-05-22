@@ -200,8 +200,4 @@ export async function GET(request: NextRequest) {
   );
 }
 
-// Apply middleware
-export const middleware = [
-  withAuth,
-  withRateLimit({ requestsPerMinute: 100 }),
-];
+// Note: Auth is handled inside POST handler via requireAuth()
