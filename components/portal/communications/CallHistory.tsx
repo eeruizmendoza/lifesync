@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Phone,
   Video,
@@ -13,6 +14,7 @@ import {
   ChevronRight,
   AlertCircle,
   PhoneMissed,
+  ChevronRight as ArrowRight,
 } from 'lucide-react';
 
 interface CallRecord {
@@ -197,7 +199,11 @@ export function CallHistory() {
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="divide-y divide-gray-50">
             {calls.map(call => (
-              <div key={call.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+              <Link
+                key={call.id}
+                href={`/calls/${call.id}`}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group"
+              >
                 {/* Type icon */}
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   call.type === 'video_call'
@@ -233,22 +239,25 @@ export function CallHistory() {
                   </div>
                 </div>
 
-                {/* Duration */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="flex items-center gap-1 text-sm text-gray-600 justify-end">
-                    <Clock size={13} className="text-gray-400" />
-                    {formatDuration(call.durationSeconds)}
+                {/* Duration + arrow */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-sm text-gray-600 justify-end">
+                      <Clock size={13} className="text-gray-400" />
+                      {formatDuration(call.durationSeconds)}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {new Date(call.createdAt).toLocaleDateString(undefined, {
+                        month: 'short', day: 'numeric',
+                      })}{' '}
+                      {new Date(call.createdAt).toLocaleTimeString(undefined, {
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5">
-                    {new Date(call.createdAt).toLocaleDateString(undefined, {
-                      month: 'short', day: 'numeric',
-                    })}{' '}
-                    {new Date(call.createdAt).toLocaleTimeString(undefined, {
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </div>
+                  <ArrowRight size={15} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 
