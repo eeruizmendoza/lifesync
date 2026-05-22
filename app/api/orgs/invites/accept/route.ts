@@ -34,9 +34,34 @@ export async function POST(req: NextRequest) {
 
     // Issue a new JWT with orgId so the caller's next requests are org-scoped
     const sql = neon(process.env.DATABASE_URL!);
-    const [row] = await sql`SELECT phone_number FROM users WHERE id = ${user.id}::uuid`;
+    const [row] = await sql`SELECT phone_number, name FROM users WHERE id = ${user.id}::uuid`;
     const phoneNumber = row?.phone_number ?? user.phoneNumber ?? '';
     const newToken = createToken(user.id, phoneNumber, invite.orgId);
+
+    // Notify all existing org admins that a new member joined
+    try {
+      const joinerName = row?.name ?? phoneNumber ?? 'Someone';
+      const orgName = org?.name ?? 'your organization';
+      const admins = await sql`
+        SELECT user_id FROM organization_members
+        WHERE org_id = ${invite.orgId}::uuid
+          AND role IN ('admin', 'owner')
+          AND user_id != ${user.id}::uuid
+      `;
+      for (const admin of admins) {
+        await sql`
+          INSERT INTO user_notifications (user_id, org_id, type, title, body, link)
+          VALUES (
+            ${admin.user_id}::uuid,
+            ${invite.orgId}::uuid,
+            'member_joined',
+            ${joinerName + ' joined ' + orgName},
+            ${'A new member has joined your organization.'},
+            '/organization'
+          )
+        `;
+      }
+    } catch { /* non-fatal */ }
 
     return NextResponse.json({ success: true, org, token: newToken });
   } catch (err) {

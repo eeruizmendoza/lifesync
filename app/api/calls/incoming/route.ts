@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
 
 // ─── GET: poll for incoming calls ────────────────────────────────────────────
 
@@ -30,13 +31,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Invalid token' }, { status: 401 });
     }
 
-    // Auto-expire old ringing calls first (> 30 seconds old)
+    // Auto-expire old ringing calls and create missed-call notifications
     try {
-      await query(
+      const expired = await query(
         `UPDATE pending_calls SET status = 'expired'
-         WHERE status = 'ringing' AND expires_at < NOW()`,
+         WHERE status = 'ringing' AND expires_at < NOW()
+         RETURNING receiver_id, caller_name, caller_phone, call_type, org_id, call_id`,
         []
       );
+      if (expired.rows.length > 0) {
+        const sql = neon(process.env.DATABASE_URL!);
+        for (const row of expired.rows) {
+          const callerLabel = row.caller_name ?? row.caller_phone ?? 'Unknown caller';
+          const callTypeLabel = row.call_type === 'video' ? 'video call' : 'phone call';
+          await sql`
+            INSERT INTO user_notifications
+              (user_id, org_id, type, title, body, link)
+            VALUES (
+              ${row.receiver_id}::uuid,
+              ${row.org_id ?? null},
+              'missed_call',
+              ${'Missed ' + callTypeLabel + ' from ' + callerLabel},
+              ${'You missed a ' + callTypeLabel + '. Call back or check your call history.'},
+              '/calls'
+            )
+            ON CONFLICT DO NOTHING
+          `;
+        }
+      }
     } catch { /* non-fatal */ }
 
     // Fetch ringing calls where this user is the receiver

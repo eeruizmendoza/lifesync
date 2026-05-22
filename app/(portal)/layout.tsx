@@ -21,6 +21,7 @@ import {
 import { IncomingCallBanner } from '@/components/portal/communications/IncomingCallBanner';
 import { TrialBanner } from '@/components/portal/TrialBanner';
 import { InviteButton } from '@/components/portal/InviteButton';
+import { NotificationsBell } from '@/components/portal/notifications/NotificationsBell';
 
 interface User {
   id: string;
@@ -208,6 +209,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <p className="text-sm font-medium text-gray-900 truncate">{user?.name ?? 'User'}</p>
               <p className="text-xs text-gray-400 truncate">{user?.phoneNumber ?? user?.email ?? ''}</p>
             </div>
+            <NotificationsBell />
           </div>
           <button
             onClick={handleLogout}
@@ -232,7 +234,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           >
             <Menu size={20} />
           </button>
-          <span className="text-lg font-bold text-gray-900">LifeSync</span>
+          <span className="text-lg font-bold text-gray-900 flex-1">LifeSync</span>
+          <NotificationsBell />
         </header>
 
         <main className="flex-1 p-6 max-w-5xl w-full mx-auto">
