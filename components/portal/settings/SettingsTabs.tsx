@@ -10,13 +10,14 @@
  */
 
 import { useState, useEffect } from 'react';
-import { User, Shield, Code2 } from 'lucide-react';
+import { User, Shield, Code2, Mail } from 'lucide-react';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
 import { ApiKeyManager } from './ApiKeyManager';
 import { WebhookManager } from './WebhookManager';
+import { ConnectedAccounts } from './ConnectedAccounts';
 
-type Tab = 'profile' | 'account' | 'developer';
+type Tab = 'profile' | 'account' | 'connected' | 'developer';
 
 export function SettingsTabs() {
   const [active, setActive] = useState<Tab>('profile');
@@ -54,6 +55,7 @@ export function SettingsTabs() {
   const TABS: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
     { id: 'profile',   label: 'Profile',    icon: <User size={16} /> },
     { id: 'account',   label: 'Account',    icon: <Shield size={16} /> },
+    { id: 'connected', label: 'Connected',  icon: <Mail size={16} /> },
     { id: 'developer', label: 'Developer',  icon: <Code2 size={16} />, adminOnly: true },
   ];
 
@@ -82,6 +84,7 @@ export function SettingsTabs() {
       {/* Tab content */}
       {active === 'profile'   && <ProfileSettings />}
       {active === 'account'   && <AccountSettings />}
+      {active === 'connected' && <ConnectedAccounts />}
       {active === 'developer' && isAdmin && (
         <div className="space-y-8">
           <ApiKeyManager />

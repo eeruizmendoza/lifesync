@@ -35,6 +35,10 @@
     {
       "path": "/api/jobs/smart-nudges",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/jobs/sync-emails",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
