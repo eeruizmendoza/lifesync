@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { sql } from '@vercel/postgres';
 
 export async function GET(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await verifyAuth(authHeader);
+    const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await verifyAuth(authHeader);
+    const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }

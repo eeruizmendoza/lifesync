@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 
 /**
  * POST /api/calls/realtime-processor
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await verifyAuth(authHeader);
+    const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid token' },
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await verifyAuth(authHeader);
+    const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }

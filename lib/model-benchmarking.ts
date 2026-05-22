@@ -467,12 +467,12 @@ export async function autoSwitchModelIfImproved(
     await sql`
       UPDATE model_config
       SET
-        active_model = $1,
-        previous_model = $2,
-        switched_at = NOW(),
-        improvement_percent = $3,
-        confidence = $4
-      WHERE model_type = $5
+        active_model = ${result.newModel},
+        previous_model = ${result.currentModel},
+        last_switched_at = NOW(),
+        improvement_percent = ${(result.improvement * 100).toFixed(2)},
+        updated_at = NOW()
+      WHERE model_type = ${result.type}
     `;
 
     // Create audit log
@@ -481,10 +481,9 @@ export async function autoSwitchModelIfImproved(
         model_type,
         from_model,
         to_model,
-        improvement_percent,
-        switched_at
+        improvement_percent
       )
-      VALUES ($1, $2, $3, $4, NOW())
+      VALUES (${result.type}, ${result.currentModel}, ${result.newModel}, ${(result.improvement * 100).toFixed(2)})
     `;
 
     console.log(`✅ Model switch complete for ${result.type}`);

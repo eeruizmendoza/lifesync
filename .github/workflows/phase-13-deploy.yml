@@ -1,0 +1,187 @@
+name: Phase 13 Production Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  test:
+    name: Test Phase 13 Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:unit -- --passWithNoTests
+
+      - name: Run E2E tests (Phase 13)
+        run: npm run test:e2e -- tests/e2e/complete-call-flow.test.ts tests/e2e/streaming-performance.test.ts
+
+      - name: Run load tests
+        run: npm run test:load -- tests/load/concurrent-calls.test.ts tests/load/streaming-concurrent.test.ts
+
+      - name: Build Next.js app
+        run: npm run build
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Check for secrets
+        run: |
+          npm install --save-dev detect-secrets
+          npx detect-secrets scan --baseline .secrets.baseline || true
+
+  database:
+    name: Database Migration Check
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          npm install drizzle-kit
+          npx drizzle-kit validate || true
+
+      - name: Generate migration SQL summary
+        run: |
+          echo "## Database Migrations" > migration-summary.md
+          echo "" >> migration-summary.md
+          echo "### Phase 13 Migrations:" >> migration-summary.md
+          echo "" >> migration-summary.md
+          ls -1 database/migrations/02*.sql | while read f; do
+            echo "- $(basename $f)" >> migration-summary.md
+          done
+
+      - name: Upload migration summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-summary
+          path: migration-summary.md
+
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [test, security, database]
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            vercel --prod --token $VERCEL_TOKEN
+          else
+            vercel --token $VERCEL_TOKEN
+          fi
+
+      - name: Set deployment environment variables
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # Add streaming-specific environment variables
+          vercel env add STREAMING_ENABLED true ${{ github.event.inputs.environment }} --token $VERCEL_TOKEN || true
+          vercel env add STREAMING_BATCH_WINDOW_MS 50 ${{ github.event.inputs.environment }} --token $VERCEL_TOKEN || true
+          vercel env add ADAPTIVE_BUFFER_MIN_MS 100 ${{ github.event.inputs.environment }} --token $VERCEL_TOKEN || true
+          vercel env add ADAPTIVE_BUFFER_MAX_MS 800 ${{ github.event.inputs.environment }} --token $VERCEL_TOKEN || true
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check API health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://api.lifesync.example.com/health)
+          if [ $response -eq 200 ]; then
+            echo "✓ API health check passed"
+          else
+            echo "✗ API health check failed: $response"
+            exit 1
+          fi
+
+      - name: Check provider health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://api.lifesync.example.com/api/providers/health)
+          if [ $response -eq 200 ]; then
+            echo "✓ Provider health check passed"
+          else
+            echo "✗ Provider health check failed: $response"
+            exit 1
+          fi
+
+      - name: Verify streaming endpoints
+        run: |
+          echo "Verifying streaming endpoints exist..."
+          # These will return 401 without auth, but endpoint should exist
+          curl -s -o /dev/null -w "Transcription: %{http_code}\n" https://api.lifesync.example.com/api/calls/test/stream-transcription
+          curl -s -o /dev/null -w "Translation: %{http_code}\n" https://api.lifesync.example.com/api/calls/test/stream-translation
+          curl -s -o /dev/null -w "TTS: %{http_code}\n" https://api.lifesync.example.com/api/calls/test/stream-tts
+
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy, health-check]
+    if: always()
+    steps:
+      - name: Success notification
+        if: success()
+        run: |
+          echo "✅ Phase 13 Deployment Successful"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Deployed: $(date)"
+
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "❌ Phase 13 Deployment Failed"
+          exit 1

@@ -2,12 +2,14 @@
  * End Call API
  * POST /api/calls/end
  * Terminate an active call
+ * Enhanced for Phase 13.3: State machine transitions, call cleanup
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getRealtimePipeline } from '@/lib/realtime-pipeline';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
+import { getCallRegistry } from '@/lib/call-state-machine';
 
 interface EndCallRequest {
   callId: string;
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await verifyAuth(authHeader);
+    const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -66,11 +68,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Fetch call from database
-    // const call = await db.conversation.findUnique({ where: { id: callId } });
-    // if (!call) return NextResponse.json({ error: 'Call not found' }, { status: 404 });
+    // Fetch call from state machine registry
+    const registry = getCallRegistry();
+    const callMachine = registry.getCall(callId);
 
-    const startTime = Date.now(); // TODO: Get actual start time from database
+    if (!callMachine) {
+      return NextResponse.json(
+        { error: 'Call not found or has expired' },
+        { status: 404 }
+      );
+    }
+
+    const callContext = callMachine.getContext();
+    const currentState = callMachine.getState();
+
+    // Can end from various states (not already ended/failed)
+    if (callMachine.isTerminal()) {
+      return NextResponse.json(
+        { error: `Call is already in terminal state: ${currentState}` },
+        { status: 400 }
+      );
+    }
+
+    // Transition to 'ending' state
+    try {
+      callMachine.transition('ending');
+    } catch (error) {
+      console.warn(`Failed to transition to ending state: ${error}`);
+    }
 
     // End real-time pipeline (if active)
     const pipeline = getRealtimePipeline();
@@ -90,6 +115,13 @@ export async function POST(request: NextRequest) {
       console.warn(`SFU room close failed (may not exist): ${error}`);
     }
 
+    // Finalize state transition to 'ended'
+    try {
+      callMachine.transition('ended');
+    } catch (error) {
+      console.error(`Failed to finalize call end: ${error}`);
+    }
+
     // Update call status in database
     // TODO: Uncomment when database is ready
     /*
@@ -98,21 +130,30 @@ export async function POST(request: NextRequest) {
       data: {
         status: 'ended',
         endTime: new Date(),
-        duration: Date.now() - call.startTime,
+        duration: callMachine.getDuration(),
       },
     });
     */
 
-    const duration = Date.now() - startTime;
+    const duration = callMachine.getDuration();
+    const finalContext = callMachine.getContext();
 
     const response: EndCallResponse = {
       callId,
       status: 'ended',
       duration,
       endedAt: Date.now(),
-      summary: pipelineResult?.summary,
+      summary: {
+        ...pipelineResult?.summary,
+        callDurationMs: duration,
+        callState: finalContext.currentState,
+        metrics: finalContext.metrics,
+      },
       transcripts: pipelineResult?.transcripts,
     };
+
+    // Remove call from registry (cleanup)
+    registry.removeCall(callId);
 
     console.log(`📞 Call ended: ${callId}`);
     console.log(`   Duration: ${(duration / 1000).toFixed(1)}s`);

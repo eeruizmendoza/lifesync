@@ -1,14 +1,18 @@
 // Jest setup file
 // Add custom matchers, global test utilities, or environment setup here
 
-// Mock environment variables for testing
-process.env.DATABASE_URL = 'postgresql://test:test@localhost/lifesync_test'
-process.env.OPENAI_WHISPER_API_KEY = 'test-key-openai'
-process.env.DEEPL_API_KEY = 'test-key-deepl'
-process.env.ELEVENLABS_API_KEY = 'test-key-elevenlabs'
-process.env.ENCRYPTION_MASTER_KEY = 'fcfafc45ead1f13cbbd5d2a60182fe65c6546d78129ccd4c747e474e3d24ae20'
-process.env.JWT_SECRET = 'xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU='
-process.env.RESEARCH_PIPELINE_CRON_SECRET = 'test-cron-secret'
+// Load environment variables from .env.local
+require('dotenv').config({ path: '.env.local' })
+
+// Set defaults for testing (use env vars if available, fall back to localhost)
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost/lifesync_test'
+process.env.POSTGRES_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL
+process.env.OPENAI_WHISPER_API_KEY = process.env.OPENAI_WHISPER_API_KEY || 'test-key-openai'
+process.env.DEEPL_API_KEY = process.env.DEEPL_API_KEY || 'test-key-deepl'
+process.env.ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || 'test-key-elevenlabs'
+process.env.ENCRYPTION_MASTER_KEY = process.env.ENCRYPTION_MASTER_KEY || 'fcfafc45ead1f13cbbd5d2a60182fe65c6546d78129ccd4c747e474e3d24ae20'
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'xVAf+OQGPGOJfjZ4uPr0NsovjpVGS32qs5XntTbJJNU='
+process.env.RESEARCH_PIPELINE_CRON_SECRET = process.env.RESEARCH_PIPELINE_CRON_SECRET || 'test-cron-secret'
 
 // Set test environment
 process.env.NODE_ENV = 'test'

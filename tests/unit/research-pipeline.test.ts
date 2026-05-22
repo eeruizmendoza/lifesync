@@ -224,7 +224,7 @@ describe('Research Pipeline', () => {
       const baselineQuality = 1.0;
       const degradation = (baselineQuality - currentQuality) / baselineQuality;
 
-      expect(degradation).toBe(0.05);
+      expect(degradation).toBeCloseTo(0.05, 5); // 5 decimal places
       expect(degradation >= degradationThreshold).toBe(true);
     });
   });

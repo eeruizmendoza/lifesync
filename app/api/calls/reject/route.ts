@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 
 interface RejectCallRequest {
   callId: string;
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const receiver = await verifyAuth(authHeader);
+    const receiver = await verifyAuthWithTestSupport(authHeader);
     if (!receiver) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
