@@ -4,6 +4,17 @@
 // Load environment variables from .env.local
 require('dotenv').config({ path: '.env.local' })
 
+// Initialize AI providers for testing
+try {
+  const { initializeTranscriptionProviders, initializeTranslationProviders, initializeTTSProviders } = require('./lib/providers/index.ts')
+  initializeTranscriptionProviders()
+  initializeTranslationProviders()
+  initializeTTSProviders()
+} catch (error) {
+  // Providers may not be available in all test contexts
+  // console.log('AI providers initialization skipped:', error.message)
+}
+
 // Set defaults for testing (use env vars if available, fall back to localhost)
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost/lifesync_test'
 process.env.POSTGRES_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL
