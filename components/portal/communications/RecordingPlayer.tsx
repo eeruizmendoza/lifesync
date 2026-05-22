@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect, SyntheticEvent } from 'react';
+import { useRef, useState, useEffect, SyntheticEvent, useCallback } from 'react';
 import { Play, Pause, Download } from 'lucide-react';
 import type { Recording, RecordingPlayerProps } from '@/lib/types/calls';
 
@@ -10,6 +10,38 @@ export function RecordingPlayer({ recording }: RecordingPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Wire download button to /api/recordings/download
+  const handleDownload = useCallback(async () => {
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+      const res = await fetch(
+        `/api/recordings/download?recordingId=${recording.id}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include' }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recording-${recording.id}.encrypted`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [recording.id]);
 
   // Sync playback rate to audio element whenever it changes
   useEffect(() => {
@@ -125,10 +157,21 @@ export function RecordingPlayer({ recording }: RecordingPlayerProps) {
       </div>
 
       {/* Download button */}
-      <button className="mt-4 w-full flex items-center justify-center gap-2 rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 transition">
-        <Download size={16} />
-        Download Encrypted Recording
+      <button
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className="mt-4 w-full flex items-center justify-center gap-2 rounded bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
+      >
+        {isDownloading ? (
+          <span className="animate-spin h-4 w-4 border-2 border-gray-500 border-t-transparent rounded-full" />
+        ) : (
+          <Download size={16} />
+        )}
+        {isDownloading ? 'Downloading…' : 'Download Encrypted Recording'}
       </button>
+      {downloadError && (
+        <p className="mt-2 text-xs text-red-600 text-center">{downloadError}</p>
+      )}
     </div>
   );
 }
