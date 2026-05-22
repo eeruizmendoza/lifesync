@@ -1,6 +1,7 @@
 import React from 'react';
 import { requireAuth } from '@/lib/auth';
 import { OrganizationSettings } from '@/components/portal/org/OrganizationSettings';
+import { OrgAnalytics } from '@/components/portal/org/OrgAnalytics';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,10 @@ export default async function OrganizationPage() {
         <h1 className="text-3xl font-bold text-gray-900">Organization</h1>
         <p className="mt-1 text-gray-600">Manage your team, roles, and invitations</p>
       </div>
+
+      {/* Analytics dashboard — only rendered when org exists (component self-hides otherwise) */}
+      <OrgAnalytics />
+
       <OrganizationSettings userId={user.id} orgId={user.orgId ?? null} />
     </div>
   );
