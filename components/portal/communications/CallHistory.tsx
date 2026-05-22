@@ -138,13 +138,20 @@ export function CallHistory() {
         </div>
       ) : calls.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
-            <Phone size={24} className="text-gray-300" />
+          <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+            <Phone size={24} className="text-blue-300" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No calls yet</h3>
-          <p className="text-gray-500 text-sm max-w-xs mx-auto">
-            Your call history will appear here after your first translated call.
+          <p className="text-gray-500 text-sm max-w-xs mx-auto mb-4">
+            Your translated call history will appear here. Start by going to Contacts and calling someone.
           </p>
+          <a
+            href="/contacts"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            <Globe size={15} />
+            Go to Contacts
+          </a>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">

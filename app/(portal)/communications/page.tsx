@@ -1,6 +1,7 @@
 import React from 'react';
 import { requireAuth } from '@/lib/auth';
 import { CommunicationsHub } from '@/components/portal/communications/CommunicationsHub';
+import { DashboardWidget } from '@/components/portal/communications/DashboardWidget';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ export default async function CommunicationsPage() {
         </p>
       </div>
 
+      <DashboardWidget />
       <CommunicationsHub userId={user.id} />
     </div>
   );
