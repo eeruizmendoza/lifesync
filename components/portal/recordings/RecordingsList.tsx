@@ -91,6 +91,7 @@ export function RecordingsList() {
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const getToken = () =>
     (typeof window !== 'undefined'
@@ -142,15 +143,16 @@ export function RecordingsList() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Download failed');
+      setActionError(err instanceof Error ? err.message : 'Download failed');
     } finally {
       setDownloading(prev => ({ ...prev, [id]: false }));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this recording? It will be permanently removed after 30 days.')) return;
+    if (!window.confirm('Delete this recording? It will be permanently removed after 30 days.')) return;
     setDeleting(prev => ({ ...prev, [id]: true }));
+    setActionError(null);
     try {
       const token = getToken();
       const res = await fetch(`/api/recordings/${id}/delete`, {
@@ -163,7 +165,7 @@ export function RecordingsList() {
       setRecordings(prev => prev.filter(r => r.id !== id));
       setTotal(prev => prev - 1);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed');
+      setActionError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setDeleting(prev => ({ ...prev, [id]: false }));
     }
@@ -204,16 +206,33 @@ export function RecordingsList() {
         <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
           <Mic size={24} className="text-blue-400" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">No recordings yet</h3>
-        <p className="text-gray-500 text-sm max-w-xs mx-auto">
-          Start a call and enable recording — your encrypted recordings will appear here.
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">No recordings yet</h3>
+        <p className="text-gray-500 text-sm max-w-xs mx-auto mb-5">
+          Start a call and consent to recording — your encrypted recordings will appear here.
+          All recordings use <span className="font-mono text-xs bg-gray-100 px-1 rounded">XChaCha20-Poly1305</span> end-to-end encryption.
         </p>
+        <a
+          href="/communications"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors"
+        >
+          <Mic size={15} />
+          Start a call
+        </a>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {/* Action error */}
+      {actionError && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertCircle size={15} className="flex-shrink-0" />
+          {actionError}
+          <button onClick={() => setActionError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+
       {/* Summary row */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
