@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createToken } from '@/lib/auth';
 import { createOrganization } from '@/lib/database/organizations';
 import { neon } from '@neondatabase/serverless';
+import { sendWelcomeEmail } from '@/lib/email-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,9 +38,18 @@ export async function POST(req: NextRequest) {
 
     // Issue a new token with orgId embedded so the frontend has it immediately
     const sql = neon(process.env.DATABASE_URL!);
-    const [row] = await sql`SELECT phone_number FROM users WHERE id = ${user.id}::uuid`;
+    const [row] = await sql`SELECT phone_number, name, email FROM users WHERE id = ${user.id}::uuid`;
     const phoneNumber = row?.phone_number ?? user.phoneNumber ?? '';
     const newToken = createToken(user.id, phoneNumber, org.id);
+
+    // Send welcome email — non-blocking
+    if (row?.email) {
+      sendWelcomeEmail({
+        toEmail: String(row.email),
+        userName: row.name ? String(row.name) : null,
+        orgName: org.name,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ org, token: newToken }, { status: 201 });
   } catch (err) {

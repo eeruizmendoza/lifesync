@@ -274,6 +274,165 @@ function buildSimpleNotificationHtml(params: {
 </html>`;
 }
 
+// ============================================================================
+// Welcome Email
+// ============================================================================
+
+export async function sendWelcomeEmail(params: {
+  toEmail: string;
+  userName: string | null;
+  orgName: string;
+}): Promise<void> {
+  try {
+    if (!process.env.RESEND_API_KEY) return;
+    const resend = getResend();
+    const { toEmail, userName, orgName } = params;
+    const displayName = userName ?? 'there';
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `Welcome to LifeSync, ${displayName}! 🎉`,
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Welcome to LifeSync</title></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+        <tr><td style="background:#2563eb;padding:32px;text-align:center;">
+          <div style="font-size:28px;font-weight:800;color:#fff;">LifeSync</div>
+          <div style="font-size:13px;color:#93c5fd;margin-top:4px;">Real-time translation for every conversation</div>
+        </td></tr>
+        <tr><td style="padding:40px 32px;">
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#111827;">Welcome, ${escapeHtml(displayName)}! 🎉</h1>
+          <p style="margin:0 0 16px;font-size:15px;color:#6b7280;line-height:1.6;">
+            Your organization <strong style="color:#374151;">${escapeHtml(orgName)}</strong> is all set up on LifeSync.
+            You're ready to start making real-time translated calls in any language.
+          </p>
+          <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">Here's what to do next:</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+            ${['Go to Contacts and add your first contact', 'Start a call and experience real-time translation', 'Invite your team members from the Organization page'].map((step, i) => `
+            <tr><td style="padding:10px 0;border-bottom:1px solid #f3f4f6;">
+              <span style="display:inline-flex;align-items:center;gap:12px;font-size:14px;color:#374151;">
+                <span style="width:24px;height:24px;background:#eff6ff;color:#2563eb;border-radius:50%;font-weight:700;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">${i + 1}</span>
+                ${step}
+              </span>
+            </td></tr>`).join('')}
+          </table>
+          <div style="text-align:center;">
+            <a href="${APP_URL}/contacts"
+               style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;">
+              Get Started
+            </a>
+          </div>
+        </td></tr>
+        <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">
+            &copy; ${new Date().getFullYear()} LifeSync. All rights reserved.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    });
+  } catch (err) {
+    console.error('[email-service] sendWelcomeEmail failed:', err);
+  }
+}
+
+// ============================================================================
+// Weekly Digest Email
+// ============================================================================
+
+export interface WeeklyDigestData {
+  orgName: string;
+  weekLabel: string; // e.g. "May 13–19, 2026"
+  totalCalls: number;
+  totalMinutes: number;
+  activeMembersCount: number;
+  topLanguagePair: string | null;
+  newMembersCount: number;
+}
+
+export async function sendWeeklyDigestEmail(params: {
+  toEmail: string;
+  userName: string | null;
+  digest: WeeklyDigestData;
+}): Promise<void> {
+  try {
+    if (!process.env.RESEND_API_KEY) return;
+    const resend = getResend();
+    const { toEmail, userName, digest } = params;
+
+    const stats = [
+      { label: 'Calls made', value: String(digest.totalCalls) },
+      { label: 'Minutes translated', value: String(digest.totalMinutes) },
+      { label: 'Active members', value: String(digest.activeMembersCount) },
+      { label: 'New members', value: String(digest.newMembersCount) },
+    ];
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: `LifeSync weekly digest — ${escapeHtml(digest.orgName)} (${digest.weekLabel})`,
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>LifeSync Weekly Digest</title></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f9fafb;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+        <tr><td style="background:#2563eb;padding:28px 32px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#fff;">LifeSync</div>
+          <div style="font-size:13px;color:#93c5fd;margin-top:4px;">Weekly digest for ${escapeHtml(digest.orgName)}</div>
+        </td></tr>
+        <tr><td style="padding:36px 32px;">
+          <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">Week of</p>
+          <h1 style="margin:0 0 28px;font-size:20px;font-weight:700;color:#111827;">${escapeHtml(digest.weekLabel)}</h1>
+
+          <!-- Stats grid -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+            <tr>
+              ${stats.map(s => `
+              <td style="width:25%;text-align:center;padding:16px 8px;background:#f8fafc;border-radius:12px;margin:4px;">
+                <div style="font-size:26px;font-weight:800;color:#2563eb;">${escapeHtml(s.value)}</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:4px;">${escapeHtml(s.label)}</div>
+              </td>`).join('<td style="width:8px;"></td>')}
+            </tr>
+          </table>
+
+          ${digest.topLanguagePair ? `
+          <div style="background:#eff6ff;border-radius:10px;padding:14px 18px;margin-bottom:24px;">
+            <span style="font-size:13px;color:#1d4ed8;font-weight:600;">🌐 Top language pair this week: </span>
+            <span style="font-size:13px;color:#1e40af;">${escapeHtml(digest.topLanguagePair)}</span>
+          </div>` : ''}
+
+          <div style="text-align:center;">
+            <a href="${APP_URL}/organization"
+               style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
+              View Full Analytics
+            </a>
+          </div>
+        </td></tr>
+        <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 32px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">
+            Sent weekly to org admins. Update preferences in <a href="${APP_URL}/settings" style="color:#6b7280;">Settings</a>.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    });
+  } catch (err) {
+    console.error('[email-service] sendWeeklyDigestEmail failed:', err);
+  }
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
