@@ -54,11 +54,13 @@ export async function POST(request: NextRequest) {
       {
         ok: true,
         message: 'Logged in successfully',
+        token,                    // returned so login page can save to localStorage
         user: {
           id: user.id,
           phoneNumber: user.phone_number,
           name: user.name,
           email: user.email,
+          orgId: org?.id ?? null,
         },
       },
       { status: 200 }
