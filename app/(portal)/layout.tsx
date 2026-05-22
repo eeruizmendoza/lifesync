@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   History,
   Users,
+  Cpu,
 } from 'lucide-react';
 
 interface User {
@@ -135,7 +136,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             );
           })}
 
-          {/* Admin link — only shown to super-admins */}
+          {/* Admin links — only shown to super-admins */}
           {user?.isAdmin && (
             <>
               <div className="my-2 border-t border-gray-100" />
@@ -143,16 +144,31 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 href="/admin"
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === '/admin' || pathname?.startsWith('/admin/')
+                  pathname === '/admin'
                     ? 'bg-purple-50 text-purple-700'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
                 <ShieldCheck
                   size={18}
-                  className={pathname === '/admin' || pathname?.startsWith('/admin/') ? 'text-purple-600' : 'text-gray-400'}
+                  className={pathname === '/admin' ? 'text-purple-600' : 'text-gray-400'}
                 />
                 Admin
+              </Link>
+              <Link
+                href="/admin/models"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === '/admin/models'
+                    ? 'bg-purple-50 text-purple-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Cpu
+                  size={18}
+                  className={pathname === '/admin/models' ? 'text-purple-600' : 'text-gray-400'}
+                />
+                AI Models
               </Link>
             </>
           )}

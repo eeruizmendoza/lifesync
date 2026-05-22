@@ -82,6 +82,22 @@ export function CommunicationsHub({ userId }: CommunicationsHubProps) {
     return () => clearTimeout(timer);
   }, [searchQuery, fetchContacts]);
 
+  // Load user's language preference from profile
+  useEffect(() => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || ''
+      : '';
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.user?.language) {
+          setUserLanguage(data.user.language);
+        }
+      })
+      .catch(() => { /* keep default */ });
+  }, []);
+
   const handleStartCall = (contact: Contact, type: 'audio' | 'video') => {
     setSelectedContact(contact);
     setCallType(type);

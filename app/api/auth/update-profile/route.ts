@@ -17,6 +17,8 @@ const schema = z.object({
     .refine(v => !v || SUPPORTED_LANGUAGES.includes(v), { message: 'Unsupported language code' })
     .optional()
     .nullable(),
+  notificationCalls: z.boolean().optional(),
+  notificationInvites: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -48,18 +50,21 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { name, email, language } = schema.parse(body);
+    const { name, email, language, notificationCalls, notificationInvites } = schema.parse(body);
 
-    // Update user profile (language_preference may not exist on all DBs — use DO NOTHING on conflict)
+    // Update user profile
     const result = await query(
       `UPDATE users
        SET name = COALESCE($1, name),
            email = COALESCE($2, email),
            language_preference = COALESCE($3, language_preference),
+           notification_calls = COALESCE($4, notification_calls),
+           notification_invites = COALESCE($5, notification_invites),
            updated_at = NOW()
-       WHERE id = $4
-       RETURNING id, phone_number, name, email, language_preference`,
-      [name ?? null, email ?? null, language ?? null, decoded.userId]
+       WHERE id = $6
+       RETURNING id, phone_number, name, email, language_preference, notification_calls, notification_invites`,
+      [name ?? null, email ?? null, language ?? null,
+       notificationCalls ?? null, notificationInvites ?? null, decoded.userId]
     );
 
     if (!result.rows[0]) {
@@ -81,6 +86,8 @@ export async function POST(request: NextRequest) {
           name: updatedUser.name,
           email: updatedUser.email,
           language: updatedUser.language_preference ?? 'en',
+          notificationCalls: updatedUser.notification_calls ?? true,
+          notificationInvites: updatedUser.notification_invites ?? true,
         },
       },
       { status: 200 }
