@@ -1,24 +1,25 @@
 /**
  * POST /api/recordings/upload
  * Upload encrypted recording to S3 and store metadata in database
+ * Phase 5: Recording, Encryption & Storage
  *
  * Request body:
  * {
  *   conversationId: string (UUID)
- *   recordingBuffer: ArrayBuffer (base64-encoded)
- *   recordingType: 'audio' | 'video'
+ *   callId: string (from initiateCall)
+ *   recordingBuffer: string (base64-encoded audio/video bytes)
+ *   recordingType: 'audio' | 'video' | 'screen_share'
  *   mimeType: string (e.g., 'audio/webm', 'video/webm')
  *   durationSeconds: number
- *   encryptionKeyBase64: string (base64-encoded user's conversation key)
- *   filename: string (original filename, for metadata)
+ *   encryptionKeyBase64: string (base64-encoded 32-byte XChaCha20 key)
  * }
  *
  * Response:
  * {
  *   success: boolean
- *   recordingId: string (UUID)
- *   s3Key: string
- *   s3Url: string (presigned download URL)
+ *   recordingId: string
+ *   s3Key: string (encrypted S3 object key)
+ *   s3Url: string (presigned download URL - 24hr expiry)
  *   size: number (bytes)
  *   uploadedAt: string (ISO timestamp)
  *   expiresAt: string (ISO timestamp - when presigned URL expires)
@@ -26,158 +27,160 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
-import { requireAuth } from '@/lib/auth';
-import { uploadRecordingToS3 } from '@/lib/s3-service';
-import { base64ToUint8Array } from '@/lib/encryption-v2';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
+import { uploadRecordingToS3, generatePresignedDownloadUrl } from '@/lib/s3-service';
+import {
+  createRecordingMetadata,
+  getUserStorageUsage,
+  logRecordingAccess,
+} from '@/lib/database/recordings';
 
 export async function POST(request: NextRequest) {
   try {
-    // Require authentication
-    const user = await requireAuth();
+    // 1. Verify JWT auth
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Parse request body
+    const user = await verifyAuthWithTestSupport(authHeader);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Parse request
     const body = await request.json();
-
     const {
       conversationId,
-      recordingBuffer, // base64-encoded
-      recordingType,
+      callId,
+      recordingBuffer,
+      recordingType = 'audio',
       mimeType,
       durationSeconds,
       encryptionKeyBase64,
-      filename,
     } = body;
 
-    // Validate inputs
-    if (!conversationId || !recordingBuffer || !recordingType || !mimeType) {
+    // 3. Validate required fields
+    if (!conversationId || !callId || !recordingBuffer || !mimeType || !encryptionKeyBase64) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        {
+          error: 'Missing required fields: conversationId, callId, recordingBuffer, mimeType, encryptionKeyBase64',
+        },
         { status: 400 }
       );
     }
 
-    if (!['audio', 'video'].includes(recordingType)) {
+    if (!['audio', 'video', 'screen_share'].includes(recordingType)) {
       return NextResponse.json(
-        { error: 'Invalid recording type' },
+        { error: 'Invalid recording type (must be audio, video, or screen_share)' },
         { status: 400 }
       );
     }
 
-    // Verify user owns this conversation
-    const conversationCheck = await sql`
-      SELECT id, user_id FROM conversations
-      WHERE id = $1 AND user_id = $2
-      LIMIT 1
-    `;
-
-    if (!conversationCheck.rows.length) {
+    // 4. Validate and decode encryption key (must be 32 bytes)
+    let encryptionKey: Buffer;
+    try {
+      encryptionKey = Buffer.from(encryptionKeyBase64, 'base64');
+      if (encryptionKey.length !== 32) {
+        return NextResponse.json(
+          { error: 'Encryption key must be 32 bytes (256 bits)' },
+          { status: 400 }
+        );
+      }
+    } catch (error) {
       return NextResponse.json(
-        { error: 'Conversation not found or access denied' },
-        { status: 403 }
+        { error: 'Invalid encryption key encoding (must be base64)' },
+        { status: 400 }
       );
     }
 
-    // Decode base64 buffer
-    const fileBuffer = Buffer.from(recordingBuffer, 'base64');
-
-    // Validate file size (max 2GB)
-    const MAX_SIZE = 2 * 1024 * 1024 * 1024;
-    if (fileBuffer.length > MAX_SIZE) {
+    // 5. Decode recording buffer
+    let recordingBufferDecoded: Buffer;
+    try {
+      recordingBufferDecoded = Buffer.from(recordingBuffer, 'base64');
+    } catch (error) {
       return NextResponse.json(
-        { error: 'Recording exceeds maximum size (2GB)' },
+        { error: 'Invalid recording buffer encoding (must be base64)' },
+        { status: 400 }
+      );
+    }
+
+    const fileSizeBytes = recordingBufferDecoded.length;
+
+    // 6. Check storage quota (10GB default)
+    const STORAGE_QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10GB
+    const currentUsageBytes = await getUserStorageUsage(user.id);
+
+    if (currentUsageBytes + fileSizeBytes > STORAGE_QUOTA_BYTES) {
+      const remainingBytes = STORAGE_QUOTA_BYTES - currentUsageBytes;
+      return NextResponse.json(
+        {
+          error: `Storage quota exceeded. Used: ${(currentUsageBytes / 1024 / 1024 / 1024).toFixed(2)}GB / 10GB. Remaining: ${(remainingBytes / 1024 / 1024 / 1024).toFixed(2)}GB`,
+        },
         { status: 413 }
       );
     }
 
-    // Convert encryption key from base64
-    const encryptionKey = base64ToUint8Array(encryptionKeyBase64);
-
-    if (encryptionKey.length !== 32) {
-      return NextResponse.json(
-        { error: 'Invalid encryption key length' },
-        { status: 400 }
-      );
-    }
-
-    // Upload to S3 (with encryption)
-    console.log(`Uploading recording: ${conversationId}, size: ${fileBuffer.length}`);
-
-    const s3Result = await uploadRecordingToS3(
-      fileBuffer,
+    // 7. Upload to S3 with encryption
+    const s3Key = await uploadRecordingToS3(
+      recordingBufferDecoded,
       user.id,
       conversationId,
       encryptionKey,
       {
-        filename: filename || `recording-${Date.now()}`,
+        recordingType,
         mimeType,
+        durationSeconds,
       }
     );
 
-    console.log(`S3 upload successful: ${s3Result.s3Key}`);
+    console.log(`📹 Recording uploaded to S3: ${s3Key} (${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB)`);
 
-    // Store metadata in database
-    const recordingResult = await sql`
-      INSERT INTO conversation_recordings (
-        conversation_id,
-        user_id,
-        recording_type,
-        s3_url,
-        mime_type,
-        file_size_bytes,
-        duration_seconds,
-        is_encrypted,
-        encryption_algorithm,
-        processing_status,
-        transcription_status,
-        start_time,
-        end_time
-      )
-      VALUES (
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        true,
-        'XChaCha20-Poly1305',
-        'complete',
-        'pending',
-        NOW(),
-        NOW() + INTERVAL '1 second' * $7
-      )
-      RETURNING id, created_at
-    `;
+    // 8. Create recording metadata in database
+    const recordingId = await createRecordingMetadata(
+      callId,
+      user.id,
+      conversationId,
+      s3Key,
+      mimeType,
+      fileSizeBytes,
+      durationSeconds,
+      recordingType as 'audio' | 'video' | 'screen_share',
+      true, // isEncrypted
+      'XChaCha20-Poly1305'
+    );
 
-    if (!recordingResult.rows.length) {
-      throw new Error('Failed to store recording metadata');
-    }
+    console.log(`📝 Recording metadata created: ${recordingId}`);
 
-    const recordingId = recordingResult.rows[0].id;
-    const createdAt = recordingResult.rows[0].created_at;
+    // 9. Log access for audit trail
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    await logRecordingAccess(recordingId, user.id, 'view', ipAddress, userAgent);
 
-    // Update conversation's last_message_at
-    await sql`
-      UPDATE conversations
-      SET last_message_at = NOW()
-      WHERE id = $1
-    `;
+    // 10. Generate presigned download URL (24 hours)
+    const downloadUrl = await generatePresignedDownloadUrl(s3Key, 86400);
+    const expiresAtTimestamp = Date.now() + 86400 * 1000;
 
-    console.log(`Recording metadata saved: ${recordingId}`);
-
-    return NextResponse.json({
+    const response = {
       success: true,
       recordingId,
-      s3Key: s3Result.s3Key,
-      s3Url: s3Result.url,
-      size: s3Result.size,
-      uploadedAt: createdAt,
-      expiresAt: s3Result.expiresAt,
-    });
+      s3Key,
+      s3Url: downloadUrl,
+      size: fileSizeBytes,
+      uploadedAt: new Date().toISOString(),
+      expiresAt: new Date(expiresAtTimestamp).toISOString(),
+    };
+
+    console.log(`✅ Recording upload complete: ${recordingId}`);
+    console.log(`   Size: ${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`   Type: ${recordingType}`);
+    console.log(`   Duration: ${durationSeconds}s`);
+    console.log(`   Download URL expires: ${new Date(expiresAtTimestamp).toISOString()}`);
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
-    console.error('Recording upload error:', error);
+    console.error('Failed to upload recording:', error);
+
     return NextResponse.json(
       {
         error: 'Failed to upload recording',
@@ -189,49 +192,33 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/recordings/upload?conversationId={id}
- * Get presigned upload URL for direct browser upload (optional, for optimization)
+ * GET /api/recordings/upload
+ * Health check for upload endpoint
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth();
-
-    const { searchParams } = new URL(request.url);
-    const conversationId = searchParams.get('conversationId');
-    const contentType = searchParams.get('contentType') || 'audio/webm';
-
-    if (!conversationId) {
-      return NextResponse.json(
-        { error: 'Missing conversationId parameter' },
-        { status: 400 }
-      );
-    }
-
-    // Verify user owns this conversation
-    const conversationCheck = await sql`
-      SELECT id FROM conversations
-      WHERE id = $1 AND user_id = $2
-      LIMIT 1
-    `;
-
-    if (!conversationCheck.rows.length) {
-      return NextResponse.json(
-        { error: 'Conversation not found or access denied' },
-        { status: 403 }
-      );
-    }
-
-    // Note: Direct presigned upload URLs require a separate implementation
-    // For now, return a message that client should use POST instead
-
-    return NextResponse.json({
-      message: 'Use POST endpoint to upload recordings',
-      uploadEndpoint: '/api/recordings/upload',
-    });
-  } catch (error) {
-    console.error('Recording upload info error:', error);
     return NextResponse.json(
-      { error: 'Failed to get upload info' },
+      {
+        status: 'ready',
+        endpoint: 'POST /api/recordings/upload',
+        maxFileSize: '10GB per user',
+        supportedMimeTypes: [
+          'audio/wav',
+          'audio/mp3',
+          'audio/webm',
+          'video/mp4',
+          'video/webm',
+        ],
+        requiresEncryption: true,
+        encryptionAlgorithm: 'XChaCha20-Poly1305',
+        quotaPerUser: '10GB',
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('Failed to get upload status:', error);
+    return NextResponse.json(
+      { error: 'Failed to get upload status' },
       { status: 500 }
     );
   }

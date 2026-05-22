@@ -1,32 +1,41 @@
 /**
- * GET /api/recordings/download?recordingId={id}
+ * GET /api/recordings/download?recordingId={id}&encryptionKeyBase64={key}
  * Download encrypted recording from S3 and decrypt with user's key
+ * Phase 5: Recording, Encryption & Storage
  *
  * Query parameters:
- * - recordingId: string (UUID of recording)
- * - encryptionKeyBase64: string (base64-encoded user's conversation key)
+ * - recordingId: string (UUID of recording) - required
+ * - encryptionKeyBase64: string (base64-encoded 32-byte key) - required
  *
  * Response:
- * Binary audio/video stream with proper content type
+ * Binary audio/video stream with proper content type and security headers
  *
  * Security:
  * - Only conversation participants can download
  * - Recording is decrypted in-memory only
  * - Encrypted S3 key prevents metadata leakage
+ * - Access is logged for audit trail
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
-import { requireAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { downloadRecordingFromS3 } from '@/lib/s3-service';
-import { base64ToUint8Array } from '@/lib/encryption-v2';
+import { getRecordingById, logRecordingAccess, deleteRecordingLogical } from '@/lib/database/recordings';
 
 export async function GET(request: NextRequest) {
   try {
-    // Require authentication
-    const user = await requireAuth();
+    // 1. Verify JWT auth
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Parse query parameters
+    const user = await verifyAuthWithTestSupport(authHeader);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Parse query parameters
     const { searchParams } = new URL(request.url);
     const recordingId = searchParams.get('recordingId');
     const encryptionKeyBase64 = searchParams.get('encryptionKeyBase64');
@@ -38,105 +47,75 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`Recording download requested: ${recordingId}`);
+    console.log(`📥 Recording download requested: ${recordingId}`);
 
-    // Fetch recording metadata from database
-    const recordingQuery = await sql`
-      SELECT
-        cr.id,
-        cr.conversation_id,
-        cr.user_id,
-        cr.s3_url,
-        cr.mime_type,
-        cr.file_size_bytes,
-        cr.duration_seconds,
-        c.user_id as conv_user_id,
-        c.contact_id as conv_contact_id
-      FROM conversation_recordings cr
-      JOIN conversations c ON cr.conversation_id = c.id
-      WHERE cr.id = $1
-      LIMIT 1
-    `;
+    // 3. Fetch recording metadata with access control
+    const recording = await getRecordingById(recordingId, user.id);
 
-    if (!recordingQuery.rows.length) {
+    if (!recording) {
       return NextResponse.json(
-        { error: 'Recording not found' },
+        { error: 'Recording not found or access denied' },
         { status: 404 }
       );
     }
 
-    const recording = recordingQuery.rows[0];
-
-    // Verify access control
-    // Only the owner or the contact can download
-    const isOwner = recording.user_id === user.id;
-    const isContact = recording.conv_contact_id === user.id;
-    const isConversationParticipant = recording.conv_user_id === user.id;
-
-    if (!isOwner && !isContact && !isConversationParticipant) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
-
-    // Validate S3 key exists
-    if (!recording.s3_url) {
+    // 4. Validate S3 key exists
+    if (!recording.s3Key) {
       return NextResponse.json(
         { error: 'Recording file not found in storage' },
         { status: 404 }
       );
     }
 
-    // Convert encryption key from base64
-    const encryptionKey = base64ToUint8Array(encryptionKeyBase64);
-
-    if (encryptionKey.length !== 32) {
+    // 5. Validate and decode encryption key (must be 32 bytes)
+    let encryptionKey: Buffer;
+    try {
+      encryptionKey = Buffer.from(encryptionKeyBase64, 'base64');
+      if (encryptionKey.length !== 32) {
+        return NextResponse.json(
+          { error: 'Encryption key must be 32 bytes (256 bits)' },
+          { status: 400 }
+        );
+      }
+    } catch (error) {
       return NextResponse.json(
-        { error: 'Invalid encryption key length' },
+        { error: 'Invalid encryption key encoding (must be base64)' },
         { status: 400 }
       );
     }
 
-    // Download from S3 (encrypted) and decrypt
-    console.log(`Downloading from S3: ${recording.s3_url}`);
+    // 6. Download from S3 (encrypted) and decrypt
+    console.log(`⬇️  Downloading from S3: ${recording.s3Key}`);
 
     const decryptedResult = await downloadRecordingFromS3(
-      recording.s3_url,
+      recording.s3Key,
       encryptionKey
     );
 
-    console.log(`Download complete: ${decryptedResult.size} bytes`);
+    console.log(`✅ Download complete: ${(decryptedResult.length / 1024 / 1024).toFixed(2)}MB`);
 
-    // Update last accessed timestamp
-    await sql`
-      UPDATE conversation_recordings
-      SET updated_at = NOW()
-      WHERE id = $1
-    `;
+    // 7. Log access for audit trail
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    await logRecordingAccess(recordingId, user.id, 'download', ipAddress, userAgent);
 
-    // Return decrypted audio/video stream
-    // Convert to Uint8Array for compatibility with NextResponse
-    const bodyBuffer = new Uint8Array(
-      decryptedResult.buffer instanceof ArrayBuffer
-        ? decryptedResult.buffer
-        : Buffer.isBuffer(decryptedResult.buffer)
-          ? decryptedResult.buffer.buffer
-          : decryptedResult.buffer
-    );
+    // 8. Return decrypted audio/video stream
+    const bufferToReturn = Buffer.isBuffer(decryptedResult)
+      ? decryptedResult
+      : Buffer.from(decryptedResult);
 
-    return new NextResponse(bodyBuffer as any, {
+    return new NextResponse(bufferToReturn, {
       headers: {
-        'Content-Type': decryptedResult.contentType || recording.mime_type,
-        'Content-Length': decryptedResult.size.toString(),
-        'Content-Disposition': `attachment; filename="recording-${recordingId}"`,
+        'Content-Type': recording.mimeType,
+        'Content-Length': bufferToReturn.length.toString(),
+        'Content-Disposition': `attachment; filename="recording-${recordingId}.bin"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
       },
     });
   } catch (error) {
-    console.error('Recording download error:', error);
+    console.error('Failed to download recording:', error);
     return NextResponse.json(
       {
         error: 'Failed to download recording',
@@ -149,12 +128,22 @@ export async function GET(request: NextRequest) {
 
 /**
  * DELETE /api/recordings/download?recordingId={id}
- * Delete a recording (soft delete, keeps metadata)
+ * Soft-delete a recording (marks deleted_at, keeps metadata, schedules S3 cleanup)
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await requireAuth();
+    // 1. Verify JWT auth
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
+    const user = await verifyAuthWithTestSupport(authHeader);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Parse query parameters
     const { searchParams } = new URL(request.url);
     const recordingId = searchParams.get('recordingId');
 
@@ -165,50 +154,32 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Fetch recording
-    const recordingQuery = await sql`
-      SELECT cr.id, cr.user_id, cr.s3_url
-      FROM conversation_recordings cr
-      WHERE cr.id = $1
-      LIMIT 1
-    `;
+    // 3. Soft delete (owner only)
+    const success = await deleteRecordingLogical(recordingId, user.id);
 
-    if (!recordingQuery.rows.length) {
+    if (!success) {
       return NextResponse.json(
-        { error: 'Recording not found' },
+        { error: 'Recording not found or access denied' },
         { status: 404 }
       );
     }
 
-    const recording = recordingQuery.rows[0];
+    // 4. Log access for audit trail
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    await logRecordingAccess(recordingId, user.id, 'delete', ipAddress, userAgent);
 
-    // Verify ownership
-    if (recording.user_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Only owner can delete recording' },
-        { status: 403 }
-      );
-    }
-
-    // Soft delete in database
-    await sql`
-      UPDATE conversation_recordings
-      SET deleted_at = NOW()
-      WHERE id = $1
-    `;
-
-    // Note: S3 file deletion is handled separately by cleanup job
-    // This keeps recording recoverable for a period
-
-    console.log(`Recording soft-deleted: ${recordingId}`);
+    console.log(`🗑️  Recording soft-deleted: ${recordingId}`);
+    console.log(`   Note: S3 file deletion scheduled for 30 days from now`);
 
     return NextResponse.json({
       success: true,
       recordingId,
-      message: 'Recording deleted',
+      message: 'Recording deleted. Files will be purged after 30 days.',
+      deletedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Recording deletion error:', error);
+    console.error('Failed to delete recording:', error);
     return NextResponse.json(
       {
         error: 'Failed to delete recording',
@@ -219,92 +190,3 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/recordings/download (metadata request)
- * Get recording metadata without downloading full file
- *
- * Request body:
- * {
- *   recordingId: string (UUID)
- * }
- *
- * Response:
- * {
- *   id: string
- *   conversationId: string
- *   recordingType: 'audio' | 'video'
- *   mimeType: string
- *   fileSizeBytes: number
- *   durationSeconds: number
- *   createdAt: string
- * }
- */
-export async function POST(request: NextRequest) {
-  try {
-    const user = await requireAuth();
-
-    const body = await request.json();
-    const { recordingId } = body;
-
-    if (!recordingId) {
-      return NextResponse.json(
-        { error: 'Missing recordingId' },
-        { status: 400 }
-      );
-    }
-
-    // Fetch recording metadata
-    const recordingQuery = await sql`
-      SELECT
-        cr.id,
-        cr.conversation_id,
-        cr.recording_type,
-        cr.mime_type,
-        cr.file_size_bytes,
-        cr.duration_seconds,
-        cr.created_at,
-        cr.user_id,
-        c.contact_id
-      FROM conversation_recordings cr
-      JOIN conversations c ON cr.conversation_id = c.id
-      WHERE cr.id = $1 AND cr.deleted_at IS NULL
-      LIMIT 1
-    `;
-
-    if (!recordingQuery.rows.length) {
-      return NextResponse.json(
-        { error: 'Recording not found' },
-        { status: 404 }
-      );
-    }
-
-    const recording = recordingQuery.rows[0];
-
-    // Verify access
-    if (recording.user_id !== user.id && recording.contact_id !== user.id) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json({
-      id: recording.id,
-      conversationId: recording.conversation_id,
-      recordingType: recording.recording_type,
-      mimeType: recording.mime_type,
-      fileSizeBytes: recording.file_size_bytes,
-      durationSeconds: recording.duration_seconds,
-      createdAt: recording.created_at,
-    });
-  } catch (error) {
-    console.error('Recording metadata error:', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to get recording metadata',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
-  }
-}

@@ -2,12 +2,14 @@
  * Real-Time Translation Pipeline
  * Orchestrates speech capture → transcription → translation → synthesis → playback
  * Optimized for <100ms end-to-end latency with streaming architecture
+ * Includes recording announcement for legal compliance
  */
 
 import { getTranscriptionService, TranscriptionChunk, TranscriptionResult } from './transcription-service';
 import { getTranslationService, TranslationResult } from './translation-service';
 import { getTTSService, SynthesisChunk, SynthesisResult } from './tts-service';
 import { encryptWithXChaCha20, decryptWithXChaCha20 } from './encryption-v2';
+import { getRecordingAnnouncementService } from './recording-announcement-service';
 
 // Types
 export interface CallParticipant {
@@ -44,6 +46,10 @@ export interface ActiveCall {
   events: PipelineEvent[];
   originalTranscripts: Array<{ userId: string; language: string; text: string; timestamp: number }>;
   translatedTranscripts: Array<{ userId: string; language: string; text: string; timestamp: number }>;
+  // Recording announcement metadata
+  announcementGiven?: boolean;
+  announcementJurisdiction?: string;
+  announcementTimestamp?: number;
 }
 
 // ============================================================================
@@ -55,15 +61,18 @@ class RealTimeTranslationPipeline {
   private transcriptionService = getTranscriptionService();
   private translationService = getTranslationService();
   private ttsService = getTTSService();
+  private announcementService = getRecordingAnnouncementService();
 
   /**
    * Initialize new call
    * Called when users connect and call begins
+   * Automatically generates recording announcement for legal compliance
    */
   async initializeCall(
     callId: string,
     participant1: CallParticipant,
-    participant2: CallParticipant
+    participant2: CallParticipant,
+    userState?: string // User's state for jurisdiction detection (e.g., 'CA', 'FL')
   ): Promise<ActiveCall> {
     const call: ActiveCall = {
       callId,
@@ -78,6 +87,30 @@ class RealTimeTranslationPipeline {
 
     this.activeCalls.set(callId, call);
     console.log(`✅ Call initialized: ${callId} (${participant1.language} ↔ ${participant2.language})`);
+
+    // Generate recording announcement for legal compliance
+    try {
+      const jurisdiction = this.announcementService.detectJurisdiction(userState);
+
+      // Generate announcement audio
+      await this.announcementService.generateAnnouncement({
+        jurisdiction,
+        language: participant1.language,
+      });
+
+      // Record announcement metadata
+      call.announcementGiven = true;
+      call.announcementJurisdiction = jurisdiction;
+      call.announcementTimestamp = Date.now();
+
+      console.log(
+        `📢 Recording announcement ready: ${callId} (${jurisdiction}, ${participant1.language})`
+      );
+    } catch (error) {
+      console.warn(`Failed to generate recording announcement: ${error}`);
+      // Don't fail call if announcement generation fails - just log warning
+    }
+
     return call;
   }
 

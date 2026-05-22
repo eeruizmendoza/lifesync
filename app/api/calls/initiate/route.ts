@@ -2,13 +2,14 @@
  * Initiate Call API
  * POST /api/calls/initiate
  * Caller initiates a new call to a contact
- * Enhanced for Phase 13.3: WebSocket URL generation, state machine integration
+ * Enhanced for Phase 13.3: WebSocket URL generation, state machine integration, recording announcements
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry, CallStateContext } from '@/lib/call-state-machine';
+import { getRecordingAnnouncementService } from '@/lib/recording-announcement-service';
 import { db } from '@/lib/db';
 
 interface InitiateCallRequest {
@@ -17,6 +18,7 @@ interface InitiateCallRequest {
   sourceLanguage: string; // 'es', 'zh', etc. (caller's language)
   targetLanguage: string; // 'zh', 'es', etc. (receiver's language)
   callType: 'audio' | 'video'; // Audio or video call
+  userState?: string; // Caller's state for jurisdiction detection (e.g., 'CA', 'FL')
 }
 
 interface InitiateCallResponse {
@@ -36,6 +38,12 @@ interface InitiateCallResponse {
   metricsWsUrl: string; // Separate WebSocket for streaming metrics
   createdAt: number;
   expiresAt: number; // Call expires if not answered in 30 seconds
+  // Recording announcement information
+  announcement?: {
+    jurisdiction: string;
+    language: string;
+    isTwoPartyConsent: boolean;
+  };
 }
 
 /**
@@ -56,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request
     const body = (await request.json()) as InitiateCallRequest;
-    const { contactId, contactPhone, sourceLanguage, targetLanguage, callType = 'audio' } = body;
+    const { contactId, contactPhone, sourceLanguage, targetLanguage, callType = 'audio', userState } = body;
 
     // Validate required fields
     if (!contactId || !sourceLanguage || !targetLanguage) {
@@ -67,6 +75,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Get announcement service for recording compliance
+    const announcementService = getRecordingAnnouncementService();
+    const jurisdiction = announcementService.detectJurisdiction(userState);
+    const twoPartyConsentStates = [
+      'CA', 'FL', 'PA', 'IL', 'NY', 'WA', 'HI', 'MD', 'MT', 'NH', 'NJ', 'VA', 'VT',
+    ];
+    const isTwoPartyConsent =
+      jurisdiction === 'two-party-consent' ||
+      twoPartyConsentStates.includes((userState || '').toUpperCase());
 
     // Validate language codes
     const validLanguages = ['en', 'es', 'zh', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko'];
@@ -163,11 +181,18 @@ export async function POST(request: NextRequest) {
       metricsWsUrl,
       createdAt: Date.now(),
       expiresAt,
+      // Include announcement information for compliance
+      announcement: {
+        jurisdiction,
+        language: sourceLanguage,
+        isTwoPartyConsent,
+      },
     };
 
     console.log(`📞 Call initiated: ${callId} (${caller.id} → ${contactId})`);
     console.log(`   Languages: ${sourceLanguage} → ${targetLanguage}`);
     console.log(`   Type: ${callType}`);
+    console.log(`   Recording: ${jurisdiction} (${isTwoPartyConsent ? 'two-party consent required' : 'one-party consent'})`);
     console.log(`   Expires at: ${new Date(expiresAt).toISOString()}`);
 
     // TODO: Send push notification to receiver

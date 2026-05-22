@@ -102,6 +102,69 @@ jest.mock('@/lib/mediasoup-handler', () => ({
   })),
 }))
 
+// Mock recording-announcement-service globally for integration tests
+jest.mock('@/lib/recording-announcement-service', () => {
+  const twoPartyConsentStates = ['CA', 'FL', 'PA', 'IL', 'NY', 'WA', 'HI', 'MD', 'MT', 'NH', 'NJ', 'VA', 'VT']
+
+  const announcementTemplates = {
+    'california': {
+      'en': 'California law requires the consent of all parties to a conversation before it can be recorded. By continuing, you consent to this call being recorded.',
+      'es': 'La ley de California requiere el consentimiento de todas las partes para grabar una conversación. Al continuar, usted consiente que esta llamada sea grabada.',
+      'zh': '加州法律要求在录制对话前获得所有参与者的同意。继续进行，即表示您同意录制此通话。',
+    },
+    'florida': {
+      'en': 'Florida law requires the consent of all parties to a conversation before it can be recorded. By continuing, you consent to this call being recorded.',
+      'es': 'La ley de Florida requiere el consentimiento de todas las partes para grabar una conversación. Al continuar, usted consiente que esta llamada sea grabada.',
+      'zh': '佛罗里达州法律要求在录制对话前获得所有参与者的同意。继续进行，即表示您同意录制此通话。',
+    },
+    'two-party-consent': {
+      'en': 'This jurisdiction requires consent from all parties before recording. By continuing, you acknowledge that this call is being recorded.',
+      'es': 'Esta jurisdicción requiere el consentimiento de todas las partes antes de grabar. Al continuar, usted reconoce que esta llamada está siendo grabada.',
+      'zh': '此管辖区要求在录制前获得所有参与者的同意。继续进行，即表示您认可此通话正在录制。',
+    },
+    'one-party-consent': {
+      'en': 'You are being notified that this call is being recorded.',
+      'es': 'Se le notifica que esta llamada está siendo grabada.',
+      'zh': '您正在被告知此通话正在录制。',
+    },
+  }
+
+  // Create the mock service instance
+  const mockService = {
+    detectJurisdiction: jest.fn((state) => {
+      if (!state) return 'one-party-consent'
+      const upperState = state.toUpperCase()
+      return twoPartyConsentStates.includes(upperState) ? 'two-party-consent' : 'one-party-consent'
+    }),
+    getAnnouncementText: jest.fn((jurisdiction, language = 'en') => {
+      const template = announcementTemplates[jurisdiction] || announcementTemplates['one-party-consent']
+      return template[language] || template['en']
+    }),
+    generateAnnouncement: jest.fn(async (config) => ({
+      jurisdiction: config.jurisdiction,
+      language: config.language,
+      duration: 3.5,
+      audioUrl: 'mock://announcement-audio',
+    })),
+    playRecordingAnnouncement: jest.fn(async (callId, config) => ({
+      success: true,
+      callId,
+      jurisdiction: config.jurisdiction,
+      language: config.language,
+      duration: 3.5,
+      audioBuffer: Buffer.from('mock-announcement-audio-data'),
+    })),
+  }
+
+  return {
+    getRecordingAnnouncementService: jest.fn(() => mockService),
+    detectJurisdiction: mockService.detectJurisdiction,
+    getAnnouncementText: mockService.getAnnouncementText,
+    generateAnnouncement: mockService.generateAnnouncement,
+    playRecordingAnnouncement: mockService.playRecordingAnnouncement,
+  }
+})
+
 // Suppress console output during tests unless there's an error
 const originalError = console.error
 const originalLog = console.log
