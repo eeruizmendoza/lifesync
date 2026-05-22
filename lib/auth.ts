@@ -142,32 +142,46 @@ export async function requireAuth(
 ): Promise<{ id: string; phoneNumber: string; orgId?: string | null }> {
   let authHeader: string | null = null;
 
+  let cookieToken: string | null = null;
+
   if (request) {
     // API route context - extract from Request object
     authHeader = request.headers.get('authorization');
   } else {
-    // Server component context - use Next.js headers()
+    // Server component context - use Next.js headers() + cookies()
     try {
       const { headers } = await import('next/headers');
       const headersList = await headers();
       authHeader = headersList.get('authorization');
-    } catch (error) {
-      // Fallback for development/testing
+    } catch {
       authHeader = null;
+    }
+    // Fallback to HttpOnly cookie (set by verify-code on login)
+    if (!authHeader) {
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieStore = await cookies();
+        cookieToken = cookieStore.get('lifesync_token')?.value ?? null;
+      } catch {
+        cookieToken = null;
+      }
     }
   }
 
-  if (!authHeader) {
+  // Resolve raw token: Bearer header wins, then cookie
+  let token: string;
+  if (authHeader) {
+    const parts = authHeader.split(' ');
+    if (parts.length !== 2 || parts[0] !== 'Bearer') {
+      throw new Error('Invalid authorization header format');
+    }
+    token = parts[1];
+  } else if (cookieToken) {
+    token = cookieToken;
+  } else {
     throw new Error('Missing authorization header');
   }
 
-  // Extract Bearer token
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    throw new Error('Invalid authorization header format');
-  }
-
-  const token = parts[1];
   const verified = verifyToken(token);
 
   if (!verified) {
