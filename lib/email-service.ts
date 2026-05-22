@@ -141,7 +141,7 @@ function buildInviteHtml(params: {
  */
 export async function sendNotificationEmail(
   userId: string,
-  type: 'missed_call' | 'member_joined' | 'quota_warning',
+  type: 'missed_call' | 'member_joined' | 'quota_warning' | 'follow_up',
   payload: {
     title: string;
     body: string | null;

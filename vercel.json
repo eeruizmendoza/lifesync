@@ -23,6 +23,10 @@
     {
       "path": "/api/jobs/cleanup-rate-limits",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/send-followups",
+      "schedule": "0 8 * * *"
     }
   ]
 }

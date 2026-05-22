@@ -23,6 +23,9 @@ import {
   NotebookPen,
   CheckCircle2,
   Loader2,
+  Bell,
+  BellOff,
+  CalendarClock,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -41,6 +44,8 @@ interface CallInfo {
   callerId: string;
   contactId: string | null;
   notes: string | null;
+  followUpAt: string | null;
+  followUpSent: boolean;
   createdAt: string;
 }
 
@@ -126,6 +131,13 @@ export function CallDetail({ callId }: { callId: string }) {
   const [notesError, setNotesError] = useState<string | null>(null);
   const notesSaveTimer = useState<ReturnType<typeof setTimeout> | null>(null);
 
+  // Follow-up reminder state
+  const [followUpAt, setFollowUpAt] = useState<string | null>(null);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [followUpSaved, setFollowUpSaved] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
+
   const fetchDetail = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -142,6 +154,14 @@ export function CallDetail({ callId }: { callId: string }) {
       const data = await res.json();
       setCall(data.call);
       setNotes(data.call?.notes ?? '');
+      const fa: string | null = data.call?.followUpAt ?? null;
+      setFollowUpAt(fa);
+      if (fa) {
+        // Convert ISO → YYYY-MM-DD for date input
+        setFollowUpDate(new Date(fa).toISOString().slice(0, 10));
+      } else {
+        setFollowUpDate('');
+      }
       setRecordings(data.recordings ?? []);
       setTranscriptLines(data.transcriptLines ?? []);
     } catch (e) {
@@ -175,6 +195,61 @@ export function CallDetail({ callId }: { callId: string }) {
       setNotesError('Could not save notes. Please try again.');
     } finally {
       setNotesSaving(false);
+    }
+  }, [callId]);
+
+  const saveFollowUp = useCallback(async (dateStr: string) => {
+    if (!dateStr) return;
+    setFollowUpSaving(true);
+    setFollowUpSaved(false);
+    setFollowUpError(null);
+    const token = getToken();
+    try {
+      // Combine date input (YYYY-MM-DD) with end-of-day UTC so time is always in future
+      const isoDate = new Date(`${dateStr}T23:59:59.000Z`).toISOString();
+      const res = await fetch(`/api/calls/${callId}/followup`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ followUpAt: isoDate }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to save');
+      setFollowUpAt(data.followUpAt);
+      setFollowUpDate(new Date(data.followUpAt).toISOString().slice(0, 10));
+      setFollowUpSaved(true);
+      setTimeout(() => setFollowUpSaved(false), 2500);
+    } catch (e) {
+      setFollowUpError(e instanceof Error ? e.message : 'Could not save reminder');
+    } finally {
+      setFollowUpSaving(false);
+    }
+  }, [callId]);
+
+  const clearFollowUp = useCallback(async () => {
+    setFollowUpSaving(true);
+    setFollowUpError(null);
+    const token = getToken();
+    try {
+      const res = await fetch(`/api/calls/${callId}/followup`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ followUpAt: null }),
+      });
+      if (!res.ok) throw new Error('Failed to clear');
+      setFollowUpAt(null);
+      setFollowUpDate('');
+    } catch (e) {
+      setFollowUpError(e instanceof Error ? e.message : 'Could not clear reminder');
+    } finally {
+      setFollowUpSaving(false);
     }
   }, [callId]);
 
@@ -340,6 +415,74 @@ export function CallDetail({ callId }: { callId: string }) {
             Save notes
           </button>
         </div>
+      </div>
+
+      {/* Follow-up Reminder */}
+      <div className={`rounded-2xl border p-6 ${followUpAt ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className={`text-sm font-semibold flex items-center gap-2 ${followUpAt ? 'text-amber-800' : 'text-gray-800'}`}>
+            {followUpAt ? <Bell size={15} className="text-amber-500" /> : <CalendarClock size={15} className="text-blue-500" />}
+            Follow-up Reminder
+          </h3>
+          <div className="flex items-center gap-2 h-6">
+            {followUpSaving && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <Loader2 size={12} className="animate-spin" /> Saving…
+              </span>
+            )}
+            {followUpSaved && !followUpSaving && (
+              <span className="flex items-center gap-1 text-xs text-green-600">
+                <CheckCircle2 size={12} /> Saved
+              </span>
+            )}
+            {followUpError && !followUpSaving && (
+              <span className="text-xs text-red-500">{followUpError}</span>
+            )}
+          </div>
+        </div>
+
+        {followUpAt && (
+          <div className="flex items-center gap-3 mb-3 p-3 bg-amber-100 rounded-xl">
+            <Bell size={16} className="text-amber-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">
+                Reminder set for {new Date(followUpAt).toLocaleDateString(undefined, {
+                  weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">You&apos;ll receive a notification when this date arrives.</p>
+            </div>
+            <button
+              onClick={clearFollowUp}
+              disabled={followUpSaving}
+              className="flex items-center gap-1 text-xs text-amber-700 hover:text-red-600 border border-amber-300 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <BellOff size={12} />
+              Clear
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <input
+            type="date"
+            value={followUpDate}
+            min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+            max={new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)}
+            onChange={e => { setFollowUpDate(e.target.value); setFollowUpError(null); }}
+            className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            onClick={() => saveFollowUp(followUpDate)}
+            disabled={!followUpDate || followUpSaving}
+            className="text-sm px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {followUpAt ? 'Update' : 'Set reminder'}
+          </button>
+        </div>
+        {!followUpAt && (
+          <p className="text-xs text-gray-400 mt-2">Pick a date to be notified to follow up on this call.</p>
+        )}
       </div>
 
       {/* Recordings */}
