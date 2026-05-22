@@ -10,6 +10,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Send, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
 import { VoiceMessageButton } from './VoiceMessageButton';
+import { FileShareButton } from './FileShareButton';
 
 interface ChatInputProps {
   receiverUserId: string;
@@ -142,6 +143,16 @@ export function ChatInput({
             receiverName={receiverName}
             userLanguage={userLanguage}
             receiverLanguage={receiverLanguage}
+            onMessageSent={onMessageSent}
+          />
+        </div>
+
+        {/* File & photo share buttons */}
+        <div className="mt-2">
+          <FileShareButton
+            receiverUserId={receiverUserId}
+            receiverName={receiverName}
+            userLanguage={userLanguage}
             onMessageSent={onMessageSent}
           />
         </div>

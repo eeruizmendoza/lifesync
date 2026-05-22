@@ -250,10 +250,16 @@ function TimelineCard({
           </div>
         )}
 
-        {/* Photo preview placeholder */}
+        {/* Photo preview */}
         {item.kind === 'photo' && item.mediaUrl && (
-          <div className="mt-2 w-32 h-24 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 border border-gray-200 text-xs">
-            📷 Photo
+          <div className="mt-2 rounded-xl overflow-hidden border border-gray-100 inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.mediaUrl}
+              alt={item.mediaName ?? 'Photo'}
+              className="max-h-48 max-w-xs object-cover cursor-pointer hover:opacity-95 transition-opacity"
+              onClick={() => window.open(item.mediaUrl!, '_blank')}
+            />
           </div>
         )}
 
