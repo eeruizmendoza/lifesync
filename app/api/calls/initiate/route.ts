@@ -12,6 +12,7 @@ import { getCallRegistry, CallStateContext } from '@/lib/call-state-machine';
 import { getRecordingAnnouncementService } from '@/lib/recording-announcement-service';
 import { db } from '@/lib/db';
 import { requireOrgContext, recordCallUsage } from '@/lib/tenant-middleware';
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limiter';
 
 interface InitiateCallRequest {
   contactId: string; // UUID of person being called
@@ -61,6 +62,15 @@ export async function POST(request: NextRequest) {
     const caller = await verifyAuthWithTestSupport(authHeader);
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 20 call initiations per minute per user
+    const callRl = await rateLimit({ key: `uid:${caller.id}:call-initiate`, ...RATE_LIMITS.callInitiate });
+    if (!callRl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many call attempts. Please wait a moment.' },
+        { status: 429, headers: { 'Retry-After': String(callRl.retryAfter) } }
+      );
     }
 
     // Phase 3: enforce org quota before initiating call

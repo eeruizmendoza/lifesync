@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { neon } from '@neondatabase/serverless';
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,15 @@ export async function GET(req: NextRequest) {
 
     const user = await verifyAuthWithTestSupport(authHeader);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Rate limit: 30 searches per minute per user
+    const rl = await rateLimit({ key: `uid:${user.id}:search`, ...RATE_LIMITS.search });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many search requests. Please slow down.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get('q') ?? '').trim();

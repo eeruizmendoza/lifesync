@@ -12,6 +12,7 @@ import {
   createToken,
 } from '@/lib/auth';
 import { getUserOrganization } from '@/lib/database/organizations';
+import { rateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limiter';
 
 const schema = z.object({
   phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
@@ -22,6 +23,16 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 verify attempts per 5 minutes per IP
+    const ip = getClientIp(request.headers);
+    const rl = await rateLimit({ key: `ip:${ip}:verify-code`, ...RATE_LIMITS.verifyCode });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'Too many login attempts. Please wait before trying again.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      );
+    }
+
     const body = await request.json();
     const { phoneNumber, code, name, email } = schema.parse(body);
 

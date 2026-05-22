@@ -8,6 +8,7 @@ import twilio from 'twilio';
 import { z } from 'zod';
 import { query } from '@/lib/db';
 import { generateVerificationCode, hashCode, storeSMSCode } from '@/lib/auth';
+import { rateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limiter';
 
 const schema = z.object({
   phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number format'),
@@ -31,6 +32,16 @@ function getTwilioClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 send-code requests per minute per IP
+    const ip = getClientIp(request.headers);
+    const rl = await rateLimit({ key: `ip:${ip}:send-code`, ...RATE_LIMITS.sendCode });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'Too many requests. Please wait before requesting another code.' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter), 'X-RateLimit-Remaining': '0' } }
+      );
+    }
+
     const body = await request.json();
     const { phoneNumber } = schema.parse(body);
 
