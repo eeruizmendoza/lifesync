@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
+import { requireAdminRole } from '@/lib/tenant-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest) {
     const user = await requireAuth(req).catch(() => null);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!user.orgId) return NextResponse.json({ error: 'No organization' }, { status: 400 });
+    const roleErr = await requireAdminRole(user);
+    if (roleErr) return roleErr;
 
     const sql = neon(process.env.DATABASE_URL!);
 
@@ -82,6 +85,8 @@ export async function POST(req: NextRequest) {
     const user = await requireAuth(req).catch(() => null);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!user.orgId) return NextResponse.json({ error: 'No organization' }, { status: 400 });
+    const roleErr2 = await requireAdminRole(user);
+    if (roleErr2) return roleErr2;
 
     const body = await req.json().catch(() => ({}));
     const { url, description, events } = body as {

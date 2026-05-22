@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { requireAdminRole } from '@/lib/tenant-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,8 @@ export async function PATCH(
     const user = await requireAuth(req).catch(() => null);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!user.orgId) return NextResponse.json({ error: 'No organization' }, { status: 400 });
+    const roleErrP = await requireAdminRole(user);
+    if (roleErrP) return roleErrP;
 
     const { id } = await context.params;
     const body = await req.json().catch(() => ({}));
@@ -96,6 +99,8 @@ export async function DELETE(
     const user = await requireAuth(req).catch(() => null);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!user.orgId) return NextResponse.json({ error: 'No organization' }, { status: 400 });
+    const roleErrD = await requireAdminRole(user);
+    if (roleErrD) return roleErrD;
 
     const { id } = await context.params;
     const sql = neon(process.env.DATABASE_URL!);

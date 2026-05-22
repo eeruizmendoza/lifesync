@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
 import { getUserOrganization, getOrganizationById } from '@/lib/database/organizations';
+import { requireAdminRole } from '@/lib/tenant-middleware';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Billing changes require owner or admin role
+    const roleErr = await requireAdminRole(user);
+    if (roleErr) return roleErr;
 
     const body = await req.json().catch(() => ({}));
     const { plan } = body as { plan?: string };

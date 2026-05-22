@@ -18,6 +18,7 @@ import {
   getOrganizationById,
   checkOrgQuotas,
   incrementOrgCallCount,
+  hasOrgRole,
 } from './database/organizations';
 import type { Organization } from './database/organizations';
 
@@ -88,6 +89,31 @@ export async function recordCallUsage(orgId: string): Promise<void> {
     // Non-fatal — log but don't fail the request
     console.error('[tenant] Failed to increment call count for org', orgId, err);
   }
+}
+
+/**
+ * Require that the user has at least 'admin' role in their org.
+ * Returns null on success or a 403 NextResponse on failure.
+ *
+ * Usage:
+ *   const roleError = await requireAdminRole(user);
+ *   if (roleError) return roleError;
+ */
+export async function requireAdminRole(
+  user: { id: string; orgId?: string | null },
+  minRole: 'owner' | 'admin' | 'member' | 'viewer' = 'admin'
+): Promise<NextResponse | null> {
+  if (!user.orgId) {
+    return NextResponse.json({ error: 'No organization' }, { status: 400 });
+  }
+  const ok = await hasOrgRole(user.orgId, user.id, minRole);
+  if (!ok) {
+    return NextResponse.json(
+      { error: `This action requires ${minRole} role or higher` },
+      { status: 403 }
+    );
+  }
+  return null;
 }
 
 /**
