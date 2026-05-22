@@ -174,6 +174,38 @@ export function CallProvider({ children }: { children: ReactNode }) {
     wsUrlRef.current !== null
   );
 
+  // Caller-side rejection polling
+  // When we initiated a call (ringing state), poll status-check every 3s to detect reject/expire
+  useEffect(() => {
+    if (state.callState !== 'ringing' || !state.callId) return;
+
+    const poll = async () => {
+      try {
+        const token = typeof window !== 'undefined'
+          ? localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || ''
+          : '';
+        const res = await fetch(`/api/calls/status-check?callId=${encodeURIComponent(state.callId!)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ok) {
+          if (data.status === 'rejected') {
+            dispatch({ type: 'CALL_FAILED', payload: { error: 'Call was declined by recipient' } });
+          } else if (data.status === 'expired' || data.status === 'missed') {
+            dispatch({ type: 'CALL_FAILED', payload: { error: 'Call was not answered' } });
+          }
+          // 'answered' means the recipient accepted — the call dialog handles transition
+        }
+      } catch { /* ignore */ }
+    };
+
+    poll(); // immediate check
+    const timer = setInterval(poll, 3000);
+    return () => clearInterval(timer);
+  }, [state.callState, state.callId]);
+
   // Call timer
   useEffect(() => {
     if (state.callState === 'connected' && state.callStartTime) {
@@ -194,9 +226,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const initiateCall = useCallback(
     async (contactId: string, sourceLanguage: string, targetLanguage: string) => {
       try {
+        const token = typeof window !== 'undefined'
+          ? localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || ''
+          : '';
         const response = await fetch('/api/calls/initiate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: 'include',
           body: JSON.stringify({ contactId, sourceLanguage, targetLanguage }),
         });
 
@@ -217,9 +256,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
   // Answer call
   const answerCall = useCallback(async (callId: string) => {
     try {
-      const response = await fetch(`/api/calls/${callId}/accept`, {
+      const token = typeof window !== 'undefined'
+        ? localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || ''
+        : '';
+      const response = await fetch('/api/calls/accept', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ callId, receiverId: '' }), // receiverId validated server-side from JWT
       });
 
       if (!response.ok) throw new Error('Failed to accept call');

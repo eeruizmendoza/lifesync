@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { requireAuth } from '@/lib/auth';
 import { checkSuperAdmin } from '@/lib/admin-auth';
 import { AdminDashboard } from '@/components/portal/admin/AdminDashboard';
+import { ProviderHealthPanel } from '@/components/portal/admin/ProviderHealthPanel';
 import { Shield } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,7 @@ export default async function AdminPage() {
         </div>
       </div>
       <AdminDashboard />
+      <ProviderHealthPanel />
     </div>
   );
 }
