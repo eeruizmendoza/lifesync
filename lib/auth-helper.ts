@@ -10,6 +10,7 @@ interface AuthUser {
   name?: string;
   role?: string;
   email?: string;
+  orgId?: string | null;
 }
 
 /**
@@ -41,6 +42,7 @@ export async function verifyAuthWithTestSupport(
       name: 'Test User',
       role: 'user',
       email: `${userId}@test.com`,
+      orgId: null,
     };
   }
 

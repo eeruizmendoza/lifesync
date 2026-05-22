@@ -33,12 +33,14 @@ export async function verifyCode(code: string, hashedCode: string): Promise<bool
 
 /**
  * Create JWT token for user
+ * Phase 3: includes orgId so all API routes have tenant context without a DB lookup
  */
-export function createToken(userId: string, phoneNumber: string): string {
+export function createToken(userId: string, phoneNumber: string, orgId?: string | null): string {
   return jwt.sign(
     {
       userId,
       phoneNumber,
+      orgId: orgId ?? null,
       iat: Math.floor(Date.now() / 1000),
     },
     JWT_SECRET,
@@ -49,12 +51,13 @@ export function createToken(userId: string, phoneNumber: string): string {
 /**
  * Verify JWT token
  */
-export function verifyToken(token: string): { userId: string; phoneNumber: string } | null {
+export function verifyToken(token: string): { userId: string; phoneNumber: string; orgId?: string | null } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     return {
       userId: decoded.userId,
       phoneNumber: decoded.phoneNumber,
+      orgId: decoded.orgId ?? null,
     };
   } catch (error) {
     return null;
@@ -136,7 +139,7 @@ export async function verifySMSCode(
 export async function requireAuth(
   request?: Request,
   options?: { adminOnly?: boolean }
-): Promise<{ id: string; phoneNumber: string }> {
+): Promise<{ id: string; phoneNumber: string; orgId?: string | null }> {
   let authHeader: string | null = null;
 
   if (request) {
@@ -180,6 +183,7 @@ export async function requireAuth(
   return {
     id: verified.userId,
     phoneNumber: verified.phoneNumber,
+    orgId: verified.orgId ?? null,
   };
 }
 
@@ -187,7 +191,7 @@ export async function requireAuth(
  * Verify auth from Authorization header
  * @param authHeader - The Authorization header value (e.g., "Bearer token123")
  */
-export async function verifyAuth(authHeader?: string): Promise<{ id: string; phoneNumber: string } | null> {
+export async function verifyAuth(authHeader?: string): Promise<{ id: string; phoneNumber: string; orgId?: string | null } | null> {
   if (!authHeader) {
     return null;
   }
@@ -205,9 +209,9 @@ export async function verifyAuth(authHeader?: string): Promise<{ id: string; pho
     return null;
   }
 
-  // Return user object compatible with expected interface
   return {
     id: verified.userId,
     phoneNumber: verified.phoneNumber,
+    orgId: verified.orgId ?? null,
   };
 }

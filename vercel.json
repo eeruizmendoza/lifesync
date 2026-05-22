@@ -7,6 +7,10 @@
     {
       "path": "/api/jobs/cleanup-recordings",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/reset-monthly-usage",
+      "schedule": "5 0 1 * *"
     }
   ]
 }
