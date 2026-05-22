@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { IncomingCallBanner } from '@/components/portal/communications/IncomingCallBanner';
 import { TrialBanner } from '@/components/portal/TrialBanner';
+import { InviteButton } from '@/components/portal/InviteButton';
 
 interface User {
   id: string;
@@ -191,6 +192,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             </>
           )}
         </nav>
+
+        {/* Invite button */}
+        <div className="px-4 pb-2">
+          <InviteButton variant="ghost" className="w-full justify-center text-xs" />
+        </div>
 
         {/* User profile */}
         <div className="px-4 py-4 border-t border-gray-100">
