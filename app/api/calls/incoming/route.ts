@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { neon } from '@neondatabase/serverless';
+import { sendNotificationEmail } from '@/lib/email-service';
 
 // ─── GET: poll for incoming calls ────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
         for (const row of expired.rows) {
           const callerLabel = row.caller_name ?? row.caller_phone ?? 'Unknown caller';
           const callTypeLabel = row.call_type === 'video' ? 'video call' : 'phone call';
+          const notifTitle = 'Missed ' + callTypeLabel + ' from ' + callerLabel;
+          const notifBody = 'You missed a ' + callTypeLabel + '. Call back or check your call history.';
           await sql`
             INSERT INTO user_notifications
               (user_id, org_id, type, title, body, link)
@@ -51,12 +54,17 @@ export async function GET(request: NextRequest) {
               ${row.receiver_id}::uuid,
               ${row.org_id ?? null},
               'missed_call',
-              ${'Missed ' + callTypeLabel + ' from ' + callerLabel},
-              ${'You missed a ' + callTypeLabel + '. Call back or check your call history.'},
+              ${notifTitle},
+              ${notifBody},
               '/calls'
             )
             ON CONFLICT DO NOTHING
           `;
+          // Fire email notification non-blocking
+          sendNotificationEmail(String(row.receiver_id), 'missed_call', {
+            title: notifTitle,
+            body: notifBody,
+          }).catch(() => {});
         }
       }
     } catch { /* non-fatal */ }

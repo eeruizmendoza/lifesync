@@ -7,6 +7,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import * as crypto from 'crypto';
+import { sendNotificationEmail } from './email-service';
 
 function db() {
   return neon(process.env.DATABASE_URL!);
@@ -434,6 +435,7 @@ export async function notifyOrgQuotaIfNeeded(orgId: string): Promise<void> {
       AND role IN ('admin', 'owner')
   `;
 
+  const quotaTitle = '⚠️ Usage limit approaching — ' + (org.name as string);
   for (const admin of admins) {
     for (const msg of warnings) {
       await sql`
@@ -442,11 +444,18 @@ export async function notifyOrgQuotaIfNeeded(orgId: string): Promise<void> {
           ${admin.user_id}::uuid,
           ${orgId}::uuid,
           'quota_warning',
-          ${'⚠️ Usage limit approaching — ' + (org.name as string)},
+          ${quotaTitle},
           ${msg},
           '/billing'
         )
       `;
+      // Email — non-blocking, non-fatal
+      sendNotificationEmail(String(admin.user_id), 'quota_warning', {
+        title: quotaTitle,
+        body: msg,
+        orgName: String(org.name),
+        upgradeUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lifesync.app'}/billing`,
+      }).catch(() => {});
     }
   }
 }

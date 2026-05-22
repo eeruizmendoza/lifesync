@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, createToken } from '@/lib/auth';
 import { acceptOrgInvite, getInviteByToken, getOrganizationById } from '@/lib/database/organizations';
 import { neon } from '@neondatabase/serverless';
+import { sendNotificationEmail } from '@/lib/email-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
           AND role IN ('admin', 'owner')
           AND user_id != ${user.id}::uuid
       `;
+      const joinTitle = joinerName + ' joined ' + orgName;
+      const joinBody = 'A new member has joined your organization.';
       for (const admin of admins) {
         await sql`
           INSERT INTO user_notifications (user_id, org_id, type, title, body, link)
@@ -55,11 +58,17 @@ export async function POST(req: NextRequest) {
             ${admin.user_id}::uuid,
             ${invite.orgId}::uuid,
             'member_joined',
-            ${joinerName + ' joined ' + orgName},
-            ${'A new member has joined your organization.'},
+            ${joinTitle},
+            ${joinBody},
             '/organization'
           )
         `;
+        // Email notification — non-blocking
+        sendNotificationEmail(String(admin.user_id), 'member_joined', {
+          title: joinTitle,
+          body: joinBody,
+          orgName,
+        }).catch(() => {});
       }
     } catch { /* non-fatal */ }
 
