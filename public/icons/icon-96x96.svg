@@ -1,0 +1,7 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'>
+  <rect width='96' height='96' rx='21' fill='#0f172a'/>
+  <circle cx='48' cy='48' r='28.799999999999997' fill='none' stroke='#6366f1' stroke-width='5.76'/>
+  <path d='M48 19.200000000000003 Q28.799999999999997 48 48 76.80000000000001 Q67.19999999999999 48 48 19.200000000000003' fill='none' stroke='#6366f1' stroke-width='4.800000000000001'/>
+  <line x1='19.200000000000003' y1='48' x2='76.80000000000001' y2='48' stroke='#6366f1' stroke-width='3.84'/>
+  <circle cx='48' cy='48' r='5.76' fill='#818cf8'/>
+</svg>

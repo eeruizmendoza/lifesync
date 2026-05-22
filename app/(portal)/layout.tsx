@@ -25,6 +25,8 @@ import { TrialBanner } from '@/components/portal/TrialBanner';
 import { InviteButton } from '@/components/portal/InviteButton';
 import { NotificationsBell } from '@/components/portal/notifications/NotificationsBell';
 import { GlobalSearch } from '@/components/portal/search/GlobalSearch';
+import { MobileNav } from '@/components/portal/MobileNav';
+import { PWAInstallPrompt } from '@/components/portal/PWAInstallPrompt';
 
 interface User {
   id: string;
@@ -111,6 +113,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     : (user?.phoneNumber?.slice(-2) ?? '??');
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 flex">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -249,11 +252,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <NotificationsBell />
         </header>
 
-        <main className="flex-1 p-6 max-w-5xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 max-w-5xl w-full mx-auto pb-20 md:pb-6">
           <TrialBanner />
           {children}
         </main>
       </div>
     </div>
+
+    {/* Mobile bottom navigation (hidden on md+) */}
+    <MobileNav />
+
+    {/* PWA install prompt */}
+    <PWAInstallPrompt />
+    </>
   );
 }
