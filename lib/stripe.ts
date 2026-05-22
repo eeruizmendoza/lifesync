@@ -1,20 +1,39 @@
 /**
  * Stripe Client — Phase 3 Multi-Tenant SaaS
- * Singleton so we reuse across serverless invocations.
+ * Lazy singleton — only instantiated when first called, not at build time.
+ * This prevents the build from failing when STRIPE_SECRET_KEY is not set locally.
  */
 
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  // Fail hard in production; allow undefined in test environments
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('STRIPE_SECRET_KEY is not set');
+let _stripe: Stripe | null = null;
+
+/**
+ * Get the Stripe client (lazy singleton).
+ * Throws at RUNTIME if STRIPE_SECRET_KEY is missing, not at build time.
+ */
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error(
+        'STRIPE_SECRET_KEY is not configured. ' +
+        'Add it to your Vercel environment variables and redeploy.'
+      );
+    }
+    _stripe = new Stripe(key, {
+      apiVersion: '2025-05-28.basil',
+      typescript: true,
+    });
   }
+  return _stripe;
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? 'sk_test_placeholder', {
-  apiVersion: '2025-05-28.basil',
-  typescript: true,
+// Convenience alias — the same object, lazily created
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    return (getStripe() as any)[prop];
+  },
 });
 
 /**
