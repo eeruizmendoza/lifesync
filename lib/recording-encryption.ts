@@ -13,10 +13,73 @@
  */
 
 import {
-  encryptLargeFile,
-  decryptLargeFile,
-  EncryptedFile,
+  encryptWithXChaCha20,
+  decryptWithXChaCha20,
+  EncryptionResult,
 } from './encryption-v2';
+
+// ---------------------------------------------------------------------------
+// Binary-safe chunk helpers
+//
+// encryption-v2's decryptWithXChaCha20 returns a UTF-8 string, which corrupts
+// raw binary audio/video bytes (invalid UTF-8 sequences expand).
+// To preserve binary fidelity we base64-encode each chunk BEFORE encryption
+// and base64-decode each chunk AFTER decryption.
+// ---------------------------------------------------------------------------
+
+interface BinaryEncryptedFile {
+  version: 2;
+  algorithm: string;
+  chunkCount: number;
+  chunkSize: number;
+  chunks: EncryptionResult[];
+  metadata: {
+    filename: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    createdAt: string;
+  };
+}
+
+function encryptBinaryChunked(
+  fileBuffer: Buffer,
+  key: Uint8Array,
+  chunkSize: number
+): BinaryEncryptedFile {
+  const chunks: EncryptionResult[] = [];
+
+  for (let i = 0; i < fileBuffer.length; i += chunkSize) {
+    const slice = fileBuffer.slice(i, Math.min(i + chunkSize, fileBuffer.length));
+    // Base64-encode so the payload is ASCII text — survives UTF-8 round-trip
+    const b64 = slice.toString('base64');
+    chunks.push(encryptWithXChaCha20(b64, key));
+  }
+
+  return {
+    version: 2,
+    algorithm: 'XChaCha20-Poly1305',
+    chunkCount: chunks.length,
+    chunkSize,
+    chunks,
+    metadata: {
+      filename: `recording-${Date.now()}`,
+      mimeType: '', // set by caller
+      fileSizeBytes: fileBuffer.length,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+function decryptBinaryChunked(encrypted: BinaryEncryptedFile, key: Uint8Array): Buffer {
+  const parts: Buffer[] = [];
+
+  for (const chunk of encrypted.chunks) {
+    const b64 = decryptWithXChaCha20(chunk, key); // returns base64 string
+    parts.push(Buffer.from(b64, 'base64'));
+  }
+
+  return Buffer.concat(parts);
+}
 
 export interface RecordingEncryptionMetadata {
   originalSize: number;
@@ -30,7 +93,7 @@ export interface RecordingEncryptionMetadata {
 }
 
 export interface EncryptedRecordingBlob {
-  encryptedFile: EncryptedFile; // Chunk-encrypted structure
+  encryptedFile: BinaryEncryptedFile; // Chunk-encrypted structure (binary-safe)
   metadata: RecordingEncryptionMetadata;
 }
 
@@ -65,16 +128,9 @@ export function encryptRecordingForStorage(
 
   const originalSize = audioBuffer.length;
 
-  // Encrypt in 1MB chunks using XChaCha20-Poly1305
-  const encryptedFile = encryptLargeFile(
-    audioBuffer,
-    recordingKey,
-    {
-      filename: `recording-${Date.now()}`,
-      mimeType,
-    },
-    CHUNK_SIZE_BYTES
-  );
+  // Encrypt in 1MB chunks using XChaCha20-Poly1305 (binary-safe via base64 intermediate)
+  const encryptedFile = encryptBinaryChunked(audioBuffer, recordingKey, CHUNK_SIZE_BYTES);
+  encryptedFile.metadata.mimeType = mimeType;
 
   // Estimate encrypted size (each chunk adds ~40 bytes overhead: nonce + auth tag)
   const overheadPerChunk = 40;
@@ -128,7 +184,8 @@ export function decryptRecordingFromStorage(
     throw new Error('Recording key must be 32 bytes');
   }
 
-  const decryptedBuffer = decryptLargeFile(blob.encryptedFile, recordingKey);
+  // Binary-safe decryption (reverses base64 intermediate encoding)
+  const decryptedBuffer = decryptBinaryChunked(blob.encryptedFile, recordingKey);
 
   return {
     buffer: decryptedBuffer,
@@ -146,7 +203,7 @@ export function decryptRecordingFromStorage(
 export function verifyRecordingIntegrity(
   blob: EncryptedRecordingBlob
 ): { valid: boolean; reason?: string } {
-  if (!blob.encryptedFile) {
+  if (!blob || !blob.encryptedFile) {
     return { valid: false, reason: 'Missing encryptedFile' };
   }
 
@@ -154,10 +211,10 @@ export function verifyRecordingIntegrity(
     return { valid: false, reason: 'Missing metadata' };
   }
 
-  if (blob.encryptedFile.chunkCount !== blob.encryptedFile.chunks.length) {
+  if (!blob.encryptedFile.chunks || blob.encryptedFile.chunkCount !== blob.encryptedFile.chunks.length) {
     return {
       valid: false,
-      reason: `Chunk count mismatch: expected ${blob.encryptedFile.chunkCount}, found ${blob.encryptedFile.chunks.length}`,
+      reason: `Chunk count mismatch: expected ${blob.encryptedFile.chunkCount}, found ${blob.encryptedFile.chunks?.length ?? 0}`,
     };
   }
 

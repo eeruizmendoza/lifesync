@@ -84,7 +84,9 @@ export function encryptRecordingKeyForStorage(
     throw new Error('ENCRYPTION_MASTER_KEY must be 32 bytes (64 hex chars)');
   }
 
-  return encryptWithXChaCha20(Buffer.from(recordingKey), masterKey);
+  // Base64-encode the binary key so it survives the UTF-8 round-trip inside decryptWithXChaCha20
+  const keyAsBase64 = Buffer.from(recordingKey).toString('base64');
+  return encryptWithXChaCha20(keyAsBase64, masterKey);
 }
 
 /**
@@ -107,10 +109,9 @@ export function decryptRecordingKeyFromStorage(
     throw new Error('ENCRYPTION_MASTER_KEY must be 32 bytes (64 hex chars)');
   }
 
-  const decrypted = decryptWithXChaCha20(encryptedKey, masterKey);
-
-  // decryptWithXChaCha20 returns a UTF-8 string; convert back to bytes
-  return new Uint8Array(Buffer.from(decrypted, 'utf-8'));
+  // decryptWithXChaCha20 returns a string; we base64-encoded the key at storage time
+  const keyAsBase64 = decryptWithXChaCha20(encryptedKey, masterKey);
+  return new Uint8Array(Buffer.from(keyAsBase64, 'base64'));
 }
 
 // ============================================================================
