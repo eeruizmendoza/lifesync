@@ -39,6 +39,7 @@ const PLANS = [
 export function BillingDashboard({ userId, orgId }: BillingDashboardProps) {
   const [org, setOrg] = useState<Organization | null>(null);
   const [quotas, setQuotas] = useState<{ withinLimits: boolean; violations: string[] } | null>(null);
+  const [memberCount, setMemberCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export function BillingDashboard({ userId, orgId }: BillingDashboardProps) {
       const data = await res.json();
       setOrg(data.org ?? null);
       setQuotas(data.quotas ?? null);
+      setMemberCount(data.memberCount ?? 0);
     } catch {
       setError('Failed to load organization details');
     } finally {
@@ -179,8 +181,8 @@ export function BillingDashboard({ userId, orgId }: BillingDashboardProps) {
             />
             <UsageBar
               icon={<Users size={16} />}
-              label="Seats"
-              used={0}
+              label="Team seats"
+              used={memberCount}
               max={org.maxUsers}
               unit="users"
               formatValue={(v) => v.toString()}

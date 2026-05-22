@@ -13,6 +13,7 @@ import {
   updateOrganization,
   checkOrgQuotas,
   hasOrgRole,
+  listOrgMembers,
 } from '@/lib/database/organizations';
 
 export async function GET(req: NextRequest) {
@@ -24,14 +25,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ org: null, message: 'User has no organization' });
     }
 
-    const [org, quotas] = await Promise.all([
+    const [org, quotas, members] = await Promise.all([
       getOrganizationById(user.orgId),
       checkOrgQuotas(user.orgId),
+      listOrgMembers(user.orgId),
     ]);
 
     if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
 
-    return NextResponse.json({ org, quotas });
+    return NextResponse.json({ org, quotas, memberCount: members.length });
   } catch (err) {
     console.error('[orgs GET]', err);
     return NextResponse.json({ error: 'Failed to fetch organization' }, { status: 500 });

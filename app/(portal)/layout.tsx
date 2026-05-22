@@ -19,6 +19,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { IncomingCallBanner } from '@/components/portal/communications/IncomingCallBanner';
+import { TrialBanner } from '@/components/portal/TrialBanner';
 
 interface User {
   id: string;
@@ -213,6 +214,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </header>
 
         <main className="flex-1 p-6 max-w-5xl w-full mx-auto">
+          <TrialBanner />
           {children}
         </main>
       </div>

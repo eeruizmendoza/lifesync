@@ -1,6 +1,6 @@
 import React from 'react';
 import { requireAuth } from '@/lib/auth';
-import { ProfileSettings } from '@/components/portal/settings/ProfileSettings';
+import { SettingsTabs } from '@/components/portal/settings/SettingsTabs';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export default async function SettingsPage() {
         <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
         <p className="mt-1 text-gray-600">Manage your profile and account preferences</p>
       </div>
-      <ProfileSettings />
+      <SettingsTabs />
     </div>
   );
 }
