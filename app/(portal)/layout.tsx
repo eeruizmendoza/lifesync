@@ -17,6 +17,7 @@ import {
   History,
   Users,
   Cpu,
+  Home,
 } from 'lucide-react';
 import { IncomingCallBanner } from '@/components/portal/communications/IncomingCallBanner';
 import { TrialBanner } from '@/components/portal/TrialBanner';
@@ -34,6 +35,7 @@ interface User {
 }
 
 const NAV_LINKS = [
+  { href: '/home',           label: 'Home',           icon: Home },
   { href: '/communications', label: 'Communications', icon: Phone },
   { href: '/contacts',       label: 'Contacts',       icon: Users },
   { href: '/calls',          label: 'Call History',   icon: History },

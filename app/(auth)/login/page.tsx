@@ -61,7 +61,7 @@ function LoginForm() {
       if (redirectTo && redirectTo.startsWith('/')) {
         router.push(redirectTo);
       } else if (data.user?.orgId) {
-        router.push('/communications');
+        router.push('/home');
       } else {
         router.push('/onboarding');
       }
