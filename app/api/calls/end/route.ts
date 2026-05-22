@@ -12,6 +12,7 @@ import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry } from '@/lib/call-state-machine';
 import { db } from '@/lib/db';
 import { deliverWebhookEvent } from '@/lib/webhook-service';
+import { hasAIProvider } from '@/lib/ai-summarizer';
 
 interface EndCallRequest {
   callId: string;
@@ -173,7 +174,15 @@ export async function POST(request: NextRequest) {
     console.log(`   Duration: ${(duration / 1000).toFixed(1)}s`);
     console.log(`   Ended by: ${userId}`);
 
-    // TODO: Save call recording, transcripts, and metrics to database
+    // Phase 53: Trigger AI summary generation (fire-and-forget, non-blocking)
+    if (hasAIProvider() && duration > 10_000) { // only summarize calls > 10s
+      const token = authHeader;
+      const summaryUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lifesync.app'}/api/calls/${callId}/summarize`;
+      fetch(summaryUrl, {
+        method: 'POST',
+        headers: { Authorization: token },
+      }).catch(() => {});
+    }
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {

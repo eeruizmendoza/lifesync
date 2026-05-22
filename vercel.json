@@ -27,6 +27,10 @@
     {
       "path": "/api/jobs/send-followups",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/jobs/auto-summarize",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -27,6 +27,7 @@ import {
   BellOff,
   CalendarClock,
 } from 'lucide-react';
+import { SummaryCard } from '@/components/portal/communications/SummaryCard';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,9 @@ interface CallInfo {
   notes: string | null;
   followUpAt: string | null;
   followUpSent: boolean;
+  aiSummary: Record<string, unknown> | null;
+  aiSummaryAt: string | null;
+  aiSummaryModel: string | null;
   createdAt: string;
 }
 
@@ -416,6 +420,13 @@ export function CallDetail({ callId }: { callId: string }) {
           </button>
         </div>
       </div>
+
+      {/* AI Summary — Phase 53 */}
+      <SummaryCard
+        callId={callId}
+        existing={call?.aiSummary as any ?? null}
+        model={call?.aiSummaryModel ?? null}
+      />
 
       {/* Follow-up Reminder */}
       <div className={`rounded-2xl border p-6 ${followUpAt ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
