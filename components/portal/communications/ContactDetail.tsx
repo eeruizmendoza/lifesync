@@ -3,16 +3,17 @@
 /**
  * ContactDetail
  * Shows a contact's profile, online status, language, call stats,
- * last 20 shared calls — with quick Call / Video buttons.
- * Phase 37: tags, notes, company metadata editing.
+ * and the unified ContactTimeline (all channels in one scroll).
+ * Phase 46: replaced call-only history with multi-channel timeline.
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, Phone, Video, Clock, Globe, Mail, PhoneMissed,
+  ArrowLeft, Phone, Video, Clock, Globe, Mail,
   Languages, Tag, Plus, X, Save, Check, Building2, FileText, Pin, PinOff,
 } from 'lucide-react';
+import { ContactTimeline } from '@/components/portal/contacts/ContactTimeline';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,16 +29,6 @@ interface ContactProfile {
   notes: string | null;
   company: string | null;
   isPinned: boolean;
-}
-
-interface CallRecord {
-  id: string;
-  type: string;
-  userLanguage: string;
-  contactLanguage: string;
-  languagePair: string;
-  durationSeconds: number;
-  createdAt: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -256,7 +247,6 @@ function MetadataEditor({
 
 export function ContactDetail({ contactId }: { contactId: string }) {
   const [contact, setContact] = useState<ContactProfile | null>(null);
-  const [calls, setCalls] = useState<CallRecord[]>([]);
   const [totalCalls, setTotalCalls] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -277,7 +267,6 @@ export function ContactDetail({ contactId }: { contactId: string }) {
       }
       const data = await res.json();
       setContact({ ...data.contact, tags: data.contact.tags ?? [], notes: data.contact.notes ?? null, company: data.contact.company ?? null, isPinned: data.contact.isPinned ?? false });
-      setCalls(data.calls ?? []);
       setTotalCalls(data.totalCalls ?? 0);
       setTotalMinutes(data.totalMinutes ?? 0);
     } catch (e) {
@@ -448,72 +437,12 @@ export function ContactDetail({ contactId }: { contactId: string }) {
         onSaved={updated => setContact(prev => prev ? { ...prev, ...updated } : prev)}
       />
 
-      {/* Call history with this contact */}
-      {calls.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-800">Call History</h3>
-            {totalCalls > calls.length && (
-              <p className="text-xs text-gray-400 mt-0.5">Showing last {calls.length} of {totalCalls} calls</p>
-            )}
-          </div>
-          <div className="divide-y divide-gray-50">
-            {calls.map(call => (
-              <Link
-                key={call.id}
-                href={`/calls/${call.id}`}
-                className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group"
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  call.type === 'video_call'
-                    ? 'bg-purple-100 text-purple-600'
-                    : call.durationSeconds > 0
-                    ? 'bg-blue-100 text-blue-600'
-                    : 'bg-red-50 text-red-400'
-                }`}>
-                  {call.type === 'video_call' ? (
-                    <Video size={16} />
-                  ) : call.durationSeconds > 0 ? (
-                    <Phone size={16} />
-                  ) : (
-                    <PhoneMissed size={16} />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">
-                    {call.type === 'video_call' ? 'Video call' : call.durationSeconds > 0 ? 'Phone call' : 'Missed call'}
-                  </p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                    <Globe size={10} />
-                    {langLabel(call.userLanguage)} → {langLabel(call.contactLanguage)}
-                  </p>
-                </div>
-
-                <div className="text-right flex-shrink-0">
-                  <div className="flex items-center gap-1 text-sm text-gray-600 justify-end">
-                    <Clock size={12} className="text-gray-400" />
-                    {formatDuration(call.durationSeconds)}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(call.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+      {/* Unified timeline — all channels */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <ContactTimeline contactId={contactId} />
         </div>
-      )}
-
-      {totalCalls === 0 && (
-        <div className="bg-gray-50 rounded-2xl border border-gray-100 p-8 text-center">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mx-auto mb-3 shadow-sm">
-            <Phone size={20} className="text-gray-300" />
-          </div>
-          <p className="text-sm text-gray-500">No calls with this contact yet.</p>
-          <p className="text-xs text-gray-400 mt-1">Use the Call or Video button above to get started.</p>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

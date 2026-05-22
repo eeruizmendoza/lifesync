@@ -149,24 +149,34 @@ CREATE TABLE IF NOT EXISTS source_connections (
 CREATE INDEX idx_source_user ON source_connections(user_id);
 CREATE INDEX idx_source_type ON source_connections(source_type);
 
--- Unified Messages (aggregated communications)
+-- Universal Messages Store (Migration 047)
+-- Foundation for all communication channels: in-app chat, SMS, voice messages,
+-- email, files, photos, room session transcripts. Calls stay in conversations.
 CREATE TABLE IF NOT EXISTS messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  source_type VARCHAR(50) NOT NULL, -- gmail, sms, whatsapp, call, voicemail
-  source_id VARCHAR(500) NOT NULL, -- Original ID from source
-  from_contact_encrypted TEXT NOT NULL, -- AES-256-GCM encrypted email/phone
-  to_contacts_encrypted TEXT, -- AES-256-GCM encrypted array of recipients
-  subject_encrypted TEXT, -- AES-256-GCM encrypted
-  body_encrypted TEXT NOT NULL, -- AES-256-GCM encrypted
-  message_type VARCHAR(50), -- email, sms, call, voicemail, group_chat
-  duration_seconds INT, -- For calls
-  transcription_encrypted TEXT, -- AES-256-GCM encrypted (for voicemails)
-  thread_id VARCHAR(500), -- For grouping conversations
-  attachment_ids TEXT[], -- References to files table
-  created_at TIMESTAMP NOT NULL,
-  synced_at TIMESTAMP DEFAULT NOW(),
-  deleted_at TIMESTAMP -- Soft delete
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_user_id       UUID REFERENCES users(id) ON DELETE SET NULL,
+  receiver_user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
+  external_contact_id  UUID REFERENCES external_contacts(id) ON DELETE SET NULL,
+  org_id               UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  channel              TEXT NOT NULL, -- in_app_chat, sms, voice_message, email, file, photo, room_session
+  direction            TEXT NOT NULL DEFAULT 'outbound',
+  status               TEXT NOT NULL DEFAULT 'delivered',
+  content              TEXT,
+  translated_content   TEXT,
+  language             TEXT DEFAULT 'en',
+  target_language      TEXT DEFAULT 'en',
+  media_url            TEXT,
+  media_type           TEXT,
+  media_size_bytes     BIGINT,
+  media_name           TEXT,
+  external_message_id  TEXT, -- Twilio SID, Gmail ID, etc.
+  thread_id            TEXT,
+  room_session_id      UUID,
+  conversation_id      UUID REFERENCES conversations(id) ON DELETE SET NULL,
+  read_at              TIMESTAMPTZ,
+  deleted_at           TIMESTAMPTZ,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_messages_user ON messages(user_id);
