@@ -7,7 +7,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import * as crypto from 'crypto';
-import { sendNotificationEmail } from './email-service';
+import { sendNotificationEmail } from '../email-service';
 
 function db() {
   return neon(process.env.DATABASE_URL!);
