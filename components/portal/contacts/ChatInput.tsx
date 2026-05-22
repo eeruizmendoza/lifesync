@@ -2,19 +2,22 @@
 
 /**
  * ChatInput
- * Inline chat message composer for in-app chat.
+ * Inline chat message composer for in-app chat or SMS.
  * Sits at the bottom of the contact timeline view.
- * Sends via POST /api/chat/send, then calls onMessageSent to refresh timeline.
+ * Phase 55: Added SMS channel toggle when receiverPhone is provided.
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { Send, Loader2, AlertCircle, MessageSquare } from 'lucide-react';
+import { Send, Loader2, AlertCircle, MessageSquare, Smartphone } from 'lucide-react';
 import { VoiceMessageButton } from './VoiceMessageButton';
 import { FileShareButton } from './FileShareButton';
+
+type Channel = 'chat' | 'sms';
 
 interface ChatInputProps {
   receiverUserId: string;
   receiverName: string;
+  receiverPhone?: string;    // Phase 55: enables SMS channel toggle
   userLanguage?: string;
   receiverLanguage?: string;
   onMessageSent?: () => void;
@@ -36,15 +39,17 @@ const LANG_NAMES: Record<string, string> = {
 export function ChatInput({
   receiverUserId,
   receiverName,
+  receiverPhone,
   userLanguage = 'en',
   receiverLanguage = 'en',
   onMessageSent,
 }: ChatInputProps) {
-  const [text, setText]       = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
-  const [sent, setSent]       = useState(false);
-  const textareaRef           = useRef<HTMLTextAreaElement>(null);
+  const [text, setText]           = useState('');
+  const [sending, setSending]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [sent, setSent]           = useState(false);
+  const [channel, setChannel]     = useState<Channel>('chat');
+  const textareaRef               = useRef<HTMLTextAreaElement>(null);
 
   const send = useCallback(async () => {
     const trimmed = text.trim();
@@ -54,21 +59,43 @@ export function ChatInput({
     setError(null);
     try {
       const token = getToken();
-      const res = await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          receiverUserId,
-          content:        trimmed,
-          language:       userLanguage,
-          targetLanguage: receiverLanguage,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to send');
+
+      if (channel === 'sms' && receiverPhone) {
+        // ── SMS path ─────────────────────────────────────────────────────
+        const res = await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            to:              receiverPhone,
+            content:         trimmed,
+            contactUserId:   receiverUserId,
+            language:        userLanguage,
+            targetLanguage:  receiverLanguage,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Failed to send SMS');
+      } else {
+        // ── In-app chat path ─────────────────────────────────────────────
+        const res = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            receiverUserId,
+            content:        trimmed,
+            language:       userLanguage,
+            targetLanguage: receiverLanguage,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Failed to send');
+      }
 
       setText('');
       setSent(true);
@@ -80,7 +107,7 @@ export function ChatInput({
     } finally {
       setSending(false);
     }
-  }, [text, sending, receiverUserId, userLanguage, receiverLanguage, onMessageSent]);
+  }, [text, sending, channel, receiverUserId, receiverPhone, userLanguage, receiverLanguage, onMessageSent]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -93,12 +120,43 @@ export function ChatInput({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      {/* Header */}
+      {/* Header with optional channel selector */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50">
-        <MessageSquare size={14} className="text-violet-500 flex-shrink-0" />
+        {channel === 'sms'
+          ? <Smartphone size={14} className="text-blue-500 flex-shrink-0" />
+          : <MessageSquare size={14} className="text-violet-500 flex-shrink-0" />}
         <span className="text-xs font-medium text-gray-700">
           Message {receiverName}
         </span>
+
+        {/* Channel toggle — only when SMS is available */}
+        {receiverPhone && (
+          <div className="flex items-center bg-white border border-gray-200 rounded-lg p-0.5 ml-1">
+            <button
+              onClick={() => setChannel('chat')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                channel === 'chat'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <MessageSquare size={10} />
+              App
+            </button>
+            <button
+              onClick={() => setChannel('sms')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                channel === 'sms'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Smartphone size={10} />
+              SMS
+            </button>
+          </div>
+        )}
+
         {isDifferentLang && (
           <span className="ml-auto text-[10px] text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5">
             {LANG_NAMES[userLanguage] ?? userLanguage.toUpperCase()}
@@ -116,7 +174,9 @@ export function ChatInput({
             value={text}
             onChange={e => { setText(e.target.value); setError(null); }}
             onKeyDown={handleKeyDown}
-            placeholder={`Message ${receiverName}… (Enter to send, Shift+Enter for newline)`}
+            placeholder={channel === 'sms'
+              ? `Send SMS to ${receiverName}… (Enter to send)`
+              : `Message ${receiverName}… (Enter to send, Shift+Enter for newline)`}
             rows={2}
             maxLength={4000}
             disabled={sending}
@@ -129,7 +189,9 @@ export function ChatInput({
               sent
                 ? 'bg-green-500 text-white'
                 : text.trim() && !sending
-                ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-sm'
+                ? channel === 'sms'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                  : 'bg-violet-600 text-white hover:bg-violet-700 shadow-sm'
                 : 'bg-gray-100 text-gray-300 cursor-not-allowed'
             }`}
             title="Send message"
@@ -169,6 +231,14 @@ export function ChatInput({
         {isDifferentLang && text.trim() && !error && (
           <p className="mt-1.5 text-[10px] text-gray-400">
             Will be auto-translated to {LANG_NAMES[receiverLanguage] ?? receiverLanguage.toUpperCase()}
+            {channel === 'sms' ? ' before sending as SMS' : ''}
+          </p>
+        )}
+
+        {/* SMS mode indicator */}
+        {channel === 'sms' && receiverPhone && !text.trim() && (
+          <p className="mt-1.5 text-[10px] text-blue-400">
+            Sending via SMS to {receiverPhone}
           </p>
         )}
       </div>

@@ -23,6 +23,7 @@ import {
   UserX,
   MessageSquare,
   ListTodo,
+  Smartphone,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -46,6 +47,8 @@ const TYPE_ICONS: Record<string, { icon: React.ElementType; bg: string; color: s
   unread_digest:    { icon: MessageSquare, bg: 'bg-indigo-50',  color: 'text-indigo-600' },
   ai_action_item:   { icon: ListTodo,      bg: 'bg-violet-50',  color: 'text-violet-600' },
   follow_up:        { icon: AlertTriangle, bg: 'bg-amber-50',   color: 'text-amber-500'  },
+  // Phase 55 types
+  sms_received:     { icon: Smartphone,    bg: 'bg-blue-50',    color: 'text-blue-600'   },
 };
 
 function timeAgo(iso: string): string {
