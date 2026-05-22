@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
     // Run all queries in parallel for speed
-    const [statsRows, allTimeRows, recentCallRows, annotatedCallRows, onlineContactRows] =
+    const [statsRows, allTimeRows, recentCallRows, annotatedCallRows, onlineContactRows, pinnedContactRows] =
       await Promise.all([
 
         // This-month stats
@@ -127,17 +127,34 @@ export async function GET(request: NextRequest) {
         // Online contacts (seen in last 90 seconds)
         sql`
           SELECT
-            id,
-            name,
-            phone_number,
-            language_preference AS language,
-            last_seen_at
-          FROM users
-          WHERE id::text != ${user.id}
-            AND (private IS NULL OR private = false)
-            AND last_seen_at >= NOW() - INTERVAL '90 seconds'
-          ORDER BY last_seen_at DESC
+            u.id,
+            u.name,
+            u.phone_number,
+            u.language_preference AS language,
+            u.last_seen_at
+          FROM users u
+          WHERE u.id::text != ${user.id}
+            AND (u.private IS NULL OR u.private = false)
+            AND u.last_seen_at >= NOW() - INTERVAL '90 seconds'
+          ORDER BY u.last_seen_at DESC
           LIMIT 8
+        `,
+
+        // Pinned contacts
+        sql`
+          SELECT
+            u.id,
+            u.name,
+            u.phone_number,
+            u.language_preference AS language,
+            u.last_seen_at
+          FROM contacts c
+          JOIN users u ON u.id = c.contact_user_id
+          WHERE c.user_id = ${user.id}::uuid
+            AND c.is_pinned = TRUE
+            AND (u.private IS NULL OR u.private = false)
+          ORDER BY u.name ASC
+          LIMIT 12
         `,
       ]);
 
@@ -167,6 +184,12 @@ export async function GET(request: NextRequest) {
       recentCalls: recentCallRows.map(mapCall),
       annotatedCalls: annotatedCallRows.map(mapCall),
       onlineContacts: onlineContactRows.map(c => ({
+        id: String(c.id),
+        name: c.name ? String(c.name) : (c.phone_number ? String(c.phone_number) : 'Unknown'),
+        lastSeenAt: c.last_seen_at ? new Date(String(c.last_seen_at)).toISOString() : null,
+        language: c.language ? String(c.language) : 'en',
+      })) as OnlineContact[],
+      pinnedContacts: pinnedContactRows.map(c => ({
         id: String(c.id),
         name: c.name ? String(c.name) : (c.phone_number ? String(c.phone_number) : 'Unknown'),
         lastSeenAt: c.last_seen_at ? new Date(String(c.last_seen_at)).toISOString() : null,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Phone, Video, Search, Users, Globe, Mail, AlertCircle, Loader2, Tag } from 'lucide-react';
+import { Phone, Video, Search, Users, Globe, Mail, AlertCircle, Loader2, Tag, Pin, PinOff } from 'lucide-react';
 import Link from 'next/link';
 
 interface Contact {
@@ -16,6 +16,7 @@ interface Contact {
   lastSeenAt?: number | null;
   tags?: string[];
   company?: string | null;
+  isPinned?: boolean;
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -140,6 +141,29 @@ export function ContactsList() {
     const next = selectedTag === tag ? '' : tag;
     setSelectedTag(next);
     setOffset(0);
+  };
+
+  const togglePin = async (contactId: string, currentlyPinned: boolean) => {
+    const token = getToken();
+    try {
+      await fetch(`/api/users/contacts/${contactId}/pin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pinned: !currentlyPinned }),
+      });
+      // Optimistic update
+      setContacts(prev =>
+        prev.map(c => c.id === contactId ? { ...c, isPinned: !currentlyPinned } : c)
+          .sort((a, b) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
+          })
+      );
+    } catch { /* non-fatal */ }
   };
 
   const hasMore = contacts.length < total;
@@ -279,7 +303,11 @@ export function ContactsList() {
             {contacts.map(contact => (
               <div
                 key={contact.id}
-                className="bg-white rounded-xl border border-gray-100 p-4 hover:border-blue-200 hover:shadow-sm transition-all"
+                className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-all ${
+                  contact.isPinned
+                    ? 'border-blue-200 bg-blue-50/30 hover:border-blue-300'
+                    : 'border-gray-100 hover:border-blue-200'
+                }`}
               >
                 {/* Clickable name/avatar area → contact detail */}
                 <Link href={`/contacts/${contact.id}`} className="block -mx-1 px-1 -mt-1 pt-1 rounded-lg hover:bg-gray-50 transition-colors mb-1">
@@ -380,6 +408,17 @@ export function ContactsList() {
                       <Mail size={13} />
                     </a>
                   )}
+                  <button
+                    onClick={() => togglePin(contact.id, !!contact.isPinned)}
+                    className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg transition-colors ${
+                      contact.isPinned
+                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                    }`}
+                    title={contact.isPinned ? 'Unpin contact' : 'Pin contact'}
+                  >
+                    {contact.isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
                 </div>
               </div>
             ))}

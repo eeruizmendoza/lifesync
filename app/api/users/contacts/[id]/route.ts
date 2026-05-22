@@ -52,9 +52,9 @@ export async function GET(
 
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
 
-    // Fetch per-user metadata (tags, notes, company)
+    // Fetch per-user metadata (tags, notes, company, is_pinned)
     const [meta] = await sql`
-      SELECT tags, notes, company FROM contacts
+      SELECT tags, notes, company, is_pinned FROM contacts
       WHERE user_id = ${user.id}::uuid AND contact_user_id = ${contactId}::uuid
     `;
 
@@ -107,6 +107,7 @@ export async function GET(
         tags: (meta?.tags as string[]) ?? [],
         notes: meta?.notes ? String(meta.notes) : null,
         company: meta?.company ? String(meta.company) : null,
+        isPinned: Boolean(meta?.is_pinned),
       },
       calls: calls.map(c => ({
         id: String(c.id),

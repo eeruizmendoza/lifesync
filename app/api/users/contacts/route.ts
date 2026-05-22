@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
         u.language_preference AS language,
         u.last_seen_at,
         COALESCE(c.tags, '{}') AS tags,
-        c.company
+        c.company,
+        COALESCE(c.is_pinned, FALSE) AS is_pinned
       FROM users u
       LEFT JOIN contacts c
         ON c.user_id = ${user.id}::uuid
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
           ${tag} = ''
           OR ${tag} = ANY(COALESCE(c.tags, '{}'::text[]))
         )
-      ORDER BY u.last_seen_at DESC NULLS LAST, u.name ASC
+      ORDER BY COALESCE(c.is_pinned, FALSE) DESC, u.last_seen_at DESC NULLS LAST, u.name ASC
       LIMIT ${limit}
       OFFSET ${offset}
     `;
@@ -115,6 +116,7 @@ export async function GET(request: NextRequest) {
         lastSeenAt: lastSeen,
         tags: (r.tags as string[]) ?? [],
         company: r.company ? String(r.company) : null,
+        isPinned: Boolean(r.is_pinned),
       };
     });
 

@@ -22,6 +22,7 @@ import {
   Zap,
   RefreshCw,
   ChevronRight,
+  Pin,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ interface DashboardData {
   recentCalls: RecentCall[];
   annotatedCalls: RecentCall[];
   onlineContacts: OnlineContact[];
+  pinnedContacts: OnlineContact[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -146,7 +148,7 @@ export function Dashboard() {
     );
   }
 
-  const { stats, recentCalls, annotatedCalls, onlineContacts } = data;
+  const { stats, recentCalls, annotatedCalls, onlineContacts, pinnedContacts } = data;
   const hasActivity = stats.totalCalls > 0;
 
   return (
@@ -224,6 +226,48 @@ export function Dashboard() {
           Recordings
         </Link>
       </div>
+
+      {/* Pinned contacts quick-dial */}
+      {pinnedContacts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+              <Pin size={14} className="text-blue-500" />
+              Pinned Contacts
+            </h2>
+            <Link href="/contacts" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              All contacts <ChevronRight size={12} />
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {pinnedContacts.map(contact => (
+              <Link
+                key={contact.id}
+                href={`/contacts/${contact.id}`}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-blue-100 bg-blue-50 hover:bg-blue-100 hover:border-blue-200 transition-all"
+              >
+                <div className="relative flex-shrink-0">
+                  <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${avatarColor(contact.id)} flex items-center justify-center text-white text-xs font-semibold`}>
+                    {getInitials(contact.name)}
+                  </div>
+                  {contact.lastSeenAt && Math.floor((Date.now() - new Date(contact.lastSeenAt).getTime()) / 1000) < 90 && (
+                    <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-green-500 border border-white" />
+                  )}
+                </div>
+                <span className="text-xs font-medium text-gray-800">{contact.name}</span>
+                <Link
+                  href="/communications"
+                  onClick={e => e.stopPropagation()}
+                  className="p-1 bg-blue-200 text-blue-700 rounded-lg hover:bg-blue-300 transition-colors"
+                  title={`Call ${contact.name}`}
+                >
+                  <Phone size={11} />
+                </Link>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Two-column section: Recent calls + Online now */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

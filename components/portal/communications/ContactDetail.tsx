@@ -11,7 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Phone, Video, Clock, Globe, Mail, PhoneMissed,
-  Languages, Tag, Plus, X, Save, Check, Building2, FileText,
+  Languages, Tag, Plus, X, Save, Check, Building2, FileText, Pin, PinOff,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ interface ContactProfile {
   tags: string[];
   notes: string | null;
   company: string | null;
+  isPinned: boolean;
 }
 
 interface CallRecord {
@@ -275,7 +276,7 @@ export function ContactDetail({ contactId }: { contactId: string }) {
         throw new Error(d.error ?? 'Failed to load contact');
       }
       const data = await res.json();
-      setContact({ ...data.contact, tags: data.contact.tags ?? [], notes: data.contact.notes ?? null, company: data.contact.company ?? null });
+      setContact({ ...data.contact, tags: data.contact.tags ?? [], notes: data.contact.notes ?? null, company: data.contact.company ?? null, isPinned: data.contact.isPinned ?? false });
       setCalls(data.calls ?? []);
       setTotalCalls(data.totalCalls ?? 0);
       setTotalMinutes(data.totalMinutes ?? 0);
@@ -387,7 +388,7 @@ export function ContactDetail({ contactId }: { contactId: string }) {
             )}
           </div>
 
-          {/* Quick-call buttons */}
+          {/* Quick-call buttons + pin */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
               href={`/communications?action=call&contactId=${contact.id}`}
@@ -403,6 +404,27 @@ export function ContactDetail({ contactId }: { contactId: string }) {
               <Video size={15} />
               Video
             </Link>
+            <button
+              onClick={async () => {
+                const next = !contact.isPinned;
+                setContact(c => c ? { ...c, isPinned: next } : c);
+                const token = getToken();
+                await fetch(`/api/users/contacts/${contact.id}/pin`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  credentials: 'include',
+                  body: JSON.stringify({ pinned: next }),
+                }).catch(() => setContact(c => c ? { ...c, isPinned: !next } : c));
+              }}
+              className={`flex items-center justify-center p-2.5 rounded-xl border transition-colors ${
+                contact.isPinned
+                  ? 'bg-blue-100 border-blue-200 text-blue-600 hover:bg-blue-200'
+                  : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+              }`}
+              title={contact.isPinned ? 'Unpin contact' : 'Pin to dashboard'}
+            >
+              {contact.isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+            </button>
           </div>
         </div>
 
