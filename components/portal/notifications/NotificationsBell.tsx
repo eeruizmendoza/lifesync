@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+
 /**
  * NotificationsBell
  * Bell icon with unread badge. Click opens a dropdown list of notifications.
@@ -18,12 +20,15 @@ import {
   CheckCheck,
   ExternalLink,
   X,
+  UserX,
+  MessageSquare,
+  ListTodo,
 } from 'lucide-react';
 import Link from 'next/link';
 
 interface NotificationItem {
   id: string;
-  type: 'missed_call' | 'member_joined' | 'quota_warning' | 'system';
+  type: string; // missed_call | member_joined | quota_warning | system | dormant_contact | unread_digest | ai_action_item | follow_up
   title: string;
   body: string | null;
   link: string | null;
@@ -31,11 +36,16 @@ interface NotificationItem {
   createdAt: string;
 }
 
-const TYPE_ICONS = {
-  missed_call: { icon: Phone, bg: 'bg-red-50', color: 'text-red-500' },
-  member_joined: { icon: UserPlus, bg: 'bg-green-50', color: 'text-green-600' },
-  quota_warning: { icon: AlertTriangle, bg: 'bg-amber-50', color: 'text-amber-500' },
-  system: { icon: Info, bg: 'bg-blue-50', color: 'text-blue-500' },
+const TYPE_ICONS: Record<string, { icon: React.ElementType; bg: string; color: string }> = {
+  missed_call:      { icon: Phone,         bg: 'bg-red-50',     color: 'text-red-500'    },
+  member_joined:    { icon: UserPlus,      bg: 'bg-green-50',   color: 'text-green-600'  },
+  quota_warning:    { icon: AlertTriangle, bg: 'bg-amber-50',   color: 'text-amber-500'  },
+  system:           { icon: Info,          bg: 'bg-blue-50',    color: 'text-blue-500'   },
+  // Phase 54 types
+  dormant_contact:  { icon: UserX,         bg: 'bg-orange-50',  color: 'text-orange-500' },
+  unread_digest:    { icon: MessageSquare, bg: 'bg-indigo-50',  color: 'text-indigo-600' },
+  ai_action_item:   { icon: ListTodo,      bg: 'bg-violet-50',  color: 'text-violet-600' },
+  follow_up:        { icon: AlertTriangle, bg: 'bg-amber-50',   color: 'text-amber-500'  },
 };
 
 function timeAgo(iso: string): string {

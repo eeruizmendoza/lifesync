@@ -31,6 +31,10 @@
     {
       "path": "/api/jobs/auto-summarize",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/jobs/smart-nudges",
+      "schedule": "30 8 * * *"
     }
   ]
 }
