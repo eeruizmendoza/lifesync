@@ -3,40 +3,26 @@
  * Phase 13.3: API endpoints and state machine integration
  */
 
-// Mock the auth-helper function (used by updated API routes)
-const tokenToUserMap: Record<string, string> = {
-  'Bearer test-token-caller-001': 'test-caller-001',
-  'Bearer test-token-receiver-001': 'test-receiver-001',
-};
+// Note: auth-helper is NOT mocked here because it natively supports test tokens
+// and can extract user IDs from token format "test-token-{userid}"
+// This allows real auth flow to work while still accepting test tokens
 
-jest.mock('@/lib/auth-helper', () => ({
-  verifyAuthWithTestSupport: jest.fn((token: string, testUserId?: string) => {
-    if (!token || token === 'invalid') {
-      return null;
-    }
-
-    // Check if token is in our mapping
-    if (tokenToUserMap[token]) {
-      return {
-        id: testUserId || tokenToUserMap[token],
-        name: 'Test User',
-        role: 'user',
-        email: 'test@example.com',
-      };
-    }
-
-    // Generic test token handling
-    if (token.includes('test-token')) {
-      return {
-        id: testUserId || 'test-user-id',
-        name: 'Test User',
-        role: 'user',
-        email: 'test@example.com',
-      };
-    }
-
-    return null;
-  }),
+// Mock realtime pipeline
+jest.mock('@/lib/realtime-pipeline', () => ({
+  getRealtimePipeline: jest.fn(() => ({
+    endCall: jest.fn(async (callId: string) => ({
+      summary: {
+        duration: 1000,
+        totalChunks: 10,
+        averageLatency: 85,
+        successRate: 0.99,
+      },
+      transcripts: {
+        original: [],
+        translated: [],
+      },
+    })),
+  })),
 }));
 
 // Mock mediasoup
@@ -46,29 +32,50 @@ jest.mock('@/lib/mediasoup-handler', () => ({
       codecs: [],
       headerExtensions: [],
     })),
+    closeRoom: jest.fn(async () => {}),
   })),
 }));
 
 // Mock call registry
 jest.mock('@/lib/call-state-machine', () => ({
-  getCallRegistry: jest.fn(() => ({
-    createCall: jest.fn(),
-    getCall: jest.fn(),
-  })),
+  getCallRegistry: jest.fn(() => {
+    const calls: Record<string, any> = {};
+
+    return {
+      createCall: jest.fn((context: any) => {
+        calls[context.callId] = {
+          context,
+          getContext: () => context,
+          getState: () => context.currentState || 'ringing',
+          isTerminal: () => context.currentState === 'ended' || context.currentState === 'failed',
+          transition: (toState: string) => {
+            context.currentState = toState;
+          },
+          getDuration: () => Date.now() - (context.createdAt || Date.now()),
+        };
+      }),
+      getCall: jest.fn((callId: string) => calls[callId] || null),
+      removeCall: jest.fn((callId: string) => {
+        delete calls[callId];
+      }),
+    };
+  }),
 }));
 
 describe('Call Signaling API - Phase 13.3', () => {
   const baseUrl = 'http://localhost:3000/api/calls';
 
   // Mock users with unique test tokens
+  // Note: auth-helper extracts user ID from token format "test-token-{userid}"
+  // So token "Bearer test-token-caller-001" results in userId "caller-001"
   const caller = {
-    id: 'test-caller-001',
+    id: 'caller-001',
     name: 'Alice',
     token: 'Bearer test-token-caller-001',
   };
 
   const receiver = {
-    id: 'test-receiver-001',
+    id: 'receiver-001',
     name: 'Bob',
     token: 'Bearer test-token-receiver-001',
   };
@@ -450,6 +457,11 @@ describe('Call Signaling API - Phase 13.3', () => {
           userId: caller.id,
         }),
       });
+
+      if (response.status !== 200) {
+        const errorData = await response.json();
+        console.error('End call error:', errorData);
+      }
 
       expect(response.status).toBe(200);
 

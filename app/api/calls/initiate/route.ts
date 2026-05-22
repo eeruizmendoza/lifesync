@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry, CallStateContext } from '@/lib/call-state-machine';
 import { db } from '@/lib/db';
@@ -43,27 +43,15 @@ interface InitiateCallResponse {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify caller authentication
+    // Verify caller authentication (supports both production auth and test tokens)
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let caller: any;
-
-    // Allow test tokens in development/test mode
-    if (authHeader && authHeader.includes('test-token')) {
-      caller = {
-        id: 'user-1-caller',
-        name: 'Test User',
-        role: 'user',
-      };
-    } else {
-      // In production, verify the real token
-      caller = await verifyAuth(authHeader);
-      if (!caller) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    const caller = await verifyAuthWithTestSupport(authHeader);
+    if (!caller) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Parse request

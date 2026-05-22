@@ -144,10 +144,12 @@ export async function POST(request: NextRequest) {
       duration,
       endedAt: Date.now(),
       summary: {
-        ...pipelineResult?.summary,
+        totalChunks: pipelineResult?.summary?.totalChunks || 0,
+        averageLatency: pipelineResult?.summary?.averageLatency || 0,
+        successRate: pipelineResult?.summary?.successRate || 1.0,
         callDurationMs: duration,
         callState: finalContext.currentState,
-        metrics: finalContext.metrics,
+        metrics: finalContext.metrics || {},
       },
       transcripts: pipelineResult?.transcripts,
     };

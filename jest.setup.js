@@ -18,6 +18,7 @@ try {
 // Set defaults for testing (use env vars if available, fall back to localhost)
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost/lifesync_test'
 process.env.POSTGRES_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL
+process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-key-openai-main'
 process.env.OPENAI_WHISPER_API_KEY = process.env.OPENAI_WHISPER_API_KEY || 'test-key-openai'
 process.env.DEEPL_API_KEY = process.env.DEEPL_API_KEY || 'test-key-deepl'
 process.env.ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || 'test-key-elevenlabs'
@@ -61,6 +62,45 @@ global.fetch = async (input, init) => {
     headers: { 'Content-Type': 'application/json' },
   })
 }
+
+// Mock realtime pipeline globally for integration tests
+jest.mock('@/lib/realtime-pipeline', () => ({
+  getRealtimePipeline: jest.fn(() => ({
+    endCall: jest.fn(async (callId) => ({
+      summary: {
+        duration: 1000,
+        totalChunks: 10,
+        averageLatency: 85,
+        successRate: 0.99,
+      },
+      transcripts: {
+        original: [],
+        translated: [],
+      },
+    })),
+    initializeCall: jest.fn(),
+    processAudioChunk: jest.fn(),
+  })),
+  initializeCall: jest.fn(),
+  processAudioChunk: jest.fn(),
+  endCall: jest.fn(async () => ({
+    summary: { duration: 1000, totalChunks: 10, averageLatency: 85, successRate: 0.99 },
+    transcripts: { original: [], translated: [] },
+  })),
+  getCallMetrics: jest.fn(() => []),
+  isHealthy: jest.fn(() => true),
+}))
+
+// Mock mediasoup globally for integration tests
+jest.mock('@/lib/mediasoup-handler', () => ({
+  getMediasoupSFU: jest.fn(() => ({
+    getRouterRtpCapabilities: jest.fn(() => ({
+      codecs: [],
+      headerExtensions: [],
+    })),
+    closeRoom: jest.fn(async () => {}),
+  })),
+}))
 
 // Suppress console output during tests unless there's an error
 const originalError = console.error

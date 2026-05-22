@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry } from '@/lib/call-state-machine';
 
@@ -32,26 +32,15 @@ interface AcceptCallResponse {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify receiver authentication
+    // Verify receiver authentication (supports both production auth and test tokens)
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let receiver: any;
-
-    // Allow test tokens
-    if (authHeader && authHeader.includes('test-token')) {
-      receiver = {
-        id: 'user-2-receiver',
-        name: 'Test User',
-        role: 'user',
-      };
-    } else {
-      receiver = await verifyAuth(authHeader);
-      if (!receiver) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    const receiver = await verifyAuthWithTestSupport(authHeader);
+    if (!receiver) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Parse request

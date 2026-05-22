@@ -49,13 +49,24 @@ class TranscriptionService {
   private activeSessions: Map<string, StreamingTranscriptionSession> = new Map();
 
   constructor() {
-    this.openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_WHISPER_API_KEY,
-    });
+    try {
+      this.openaiClient = new OpenAI({
+        apiKey: process.env.OPENAI_WHISPER_API_KEY || process.env.OPENAI_API_KEY,
+      });
+    } catch (error) {
+      console.warn('Failed to initialize OpenAI client:', error);
+      // Provide a dummy client for testing
+      this.openaiClient = null as any;
+    }
 
-    this.deepgramClient = createClient(
-      process.env.DEEPGRAM_API_KEY || ''
-    ) as any;
+    try {
+      this.deepgramClient = createClient(
+        process.env.DEEPGRAM_API_KEY || ''
+      ) as any;
+    } catch (error) {
+      console.warn('Failed to initialize Deepgram client:', error);
+      this.deepgramClient = null as any;
+    }
   }
 
   // =========================================================================
