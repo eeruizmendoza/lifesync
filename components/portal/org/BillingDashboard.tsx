@@ -213,7 +213,18 @@ export function BillingDashboard({ userId, orgId }: BillingDashboardProps) {
 
       {/* Plan selection */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Plans</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Available Plans</h2>
+          <a
+            href="/pricing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+          >
+            <ExternalLink size={13} />
+            View full comparison
+          </a>
+        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           {PLANS.map(plan => {
             const isCurrent = org?.plan === plan.id;
