@@ -96,8 +96,48 @@ export function CallHistory() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  // Compute stats from current page of calls
+  const totalMinutes = Math.floor(
+    calls.reduce((acc, c) => acc + (c.durationSeconds ?? 0), 0) / 60
+  );
+  const answeredCalls = calls.filter(c => c.durationSeconds > 0).length;
+  const missedCalls = calls.filter(c => c.durationSeconds === 0).length;
+  // Most-used language pair across loaded calls
+  const pairCounts: Record<string, number> = {};
+  calls.forEach(c => {
+    if (c.languagePair) pairCounts[c.languagePair] = (pairCounts[c.languagePair] ?? 0) + 1;
+  });
+  const topPair = Object.entries(pairCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
   return (
     <div className="space-y-4">
+      {/* Mini stats (only when data loaded and > 0 calls) */}
+      {!loading && total > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-gray-900">{total}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Total calls</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-gray-900">{totalMinutes}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Minutes (this page)</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 text-center">
+            {topPair ? (
+              <>
+                <p className="text-sm font-bold text-gray-900 font-mono">{topPair.replace('_', '→')}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Top language pair</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-gray-900">{missedCalls}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Missed</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filter tabs */}
       <div className="flex items-center gap-2">
         {(['all', 'phone_call', 'video_call'] as const).map(f => (
