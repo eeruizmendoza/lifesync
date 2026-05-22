@@ -271,7 +271,7 @@ export function CommunicationsHub({ userId }: CommunicationsHubProps) {
 
       {/* Messages Tab */}
       {activeTab === 'messages' && (
-        <UnifiedInbox userId={userId} />
+        <UnifiedInbox />
       )}
 
       {/* Emails Tab */}

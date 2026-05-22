@@ -10,6 +10,7 @@ import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getRealtimePipeline } from '@/lib/realtime-pipeline';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry } from '@/lib/call-state-machine';
+import { db } from '@/lib/db';
 
 interface EndCallRequest {
   callId: string;
@@ -122,20 +123,19 @@ export async function POST(request: NextRequest) {
       console.error(`Failed to finalize call end: ${error}`);
     }
 
-    // Update call status in database
-    // TODO: Uncomment when database is ready
-    /*
-    const updatedCall = await db.conversation.update({
-      where: { id: callId },
-      data: {
-        status: 'ended',
-        endTime: new Date(),
-        duration: callMachine.getDuration(),
-      },
-    });
-    */
-
     const duration = callMachine.getDuration();
+
+    // Update conversation duration in database
+    try {
+      await db.query(
+        `UPDATE conversations
+         SET duration_seconds = $1, last_message_at = NOW(), updated_at = NOW()
+         WHERE id = $2`,
+        [Math.floor(duration / 1000), callId]
+      );
+    } catch (dbErr) {
+      console.error('[calls/end] Failed to update conversation duration:', dbErr);
+    }
     const finalContext = callMachine.getContext();
 
     const response: EndCallResponse = {

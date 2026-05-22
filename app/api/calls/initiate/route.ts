@@ -152,21 +152,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Create conversation record in database
-    // TODO: Uncomment when database is ready
-    /*
-    const conversation = await db.conversation.create({
-      data: {
-        id: callId,
-        type: callType,
-        sourceLanguage,
-        targetLanguage,
-        callerId: caller.id,
-        receiverId: contactId,
-        status: 'ringing',
-        startTime: new Date(),
-      },
-    });
-    */
+    try {
+      const languagePair = `${sourceLanguage}_${targetLanguage}`;
+      await db.query(
+        `INSERT INTO conversations
+          (id, user_id, contact_id, contact_phone, conversation_type,
+           user_language, contact_language, language_pair, org_id,
+           duration_seconds, participant_count, created_at, updated_at)
+         VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9, 0, 2, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          callId,
+          caller.id,
+          contactId,
+          contactPhone ?? null,
+          callType === 'video' ? 'video_call' : 'phone_call',
+          sourceLanguage,
+          targetLanguage,
+          languagePair,
+          caller.orgId ?? null,
+        ]
+      );
+    } catch (dbErr) {
+      // Non-fatal — call still proceeds even if DB write fails
+      console.error('[calls/initiate] Failed to create conversation record:', dbErr);
+    }
 
     // Prepare response
     const expiresAt = Date.now() + 30000; // 30 seconds to answer
