@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { checkSuperAdmin } from '@/lib/admin-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
         name,
         email,
         orgId: decoded.orgId ?? null,
+        isAdmin: checkSuperAdmin(decoded.phoneNumber),
       },
     });
   } catch (error) {
