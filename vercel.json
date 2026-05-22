@@ -3,6 +3,10 @@
     {
       "path": "/api/research-pipeline/run",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/jobs/cleanup-recordings",
+      "schedule": "0 2 * * *"
     }
   ]
 }

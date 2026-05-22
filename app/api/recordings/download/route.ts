@@ -87,12 +87,12 @@ export async function GET(request: NextRequest) {
     // 6. Download from S3 (encrypted) and decrypt
     console.log(`⬇️  Downloading from S3: ${recording.s3Key}`);
 
-    const decryptedResult = await downloadRecordingFromS3(
+    const s3Result = await downloadRecordingFromS3(
       recording.s3Key,
       encryptionKey
     );
 
-    console.log(`✅ Download complete: ${(decryptedResult.length / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`✅ Download complete: ${(s3Result.size / 1024 / 1024).toFixed(2)}MB`);
 
     // 7. Log access for audit trail
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
@@ -100,15 +100,17 @@ export async function GET(request: NextRequest) {
     await logRecordingAccess(recordingId, user.id, 'download', ipAddress, userAgent);
 
     // 8. Return decrypted audio/video stream
-    const bufferToReturn = Buffer.isBuffer(decryptedResult)
-      ? decryptedResult
-      : Buffer.from(decryptedResult);
+    // Copy Buffer into a fresh ArrayBuffer (BodyInit-compatible)
+    const responseBody: ArrayBuffer = s3Result.buffer.buffer.slice(
+      s3Result.buffer.byteOffset,
+      s3Result.buffer.byteOffset + s3Result.buffer.byteLength
+    ) as ArrayBuffer;
 
-    return new NextResponse(bufferToReturn, {
+    return new NextResponse(responseBody, {
       headers: {
-        'Content-Type': recording.mimeType,
-        'Content-Length': bufferToReturn.length.toString(),
-        'Content-Disposition': `attachment; filename="recording-${recordingId}.bin"`,
+        'Content-Type': s3Result.contentType || recording.mimeType,
+        'Content-Length': s3Result.size.toString(),
+        'Content-Disposition': `attachment; filename="recording-${recordingId}"`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',

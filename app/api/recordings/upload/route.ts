@@ -122,26 +122,25 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Upload to S3 with encryption
-    const s3Key = await uploadRecordingToS3(
+    const s3Result = await uploadRecordingToS3(
       recordingBufferDecoded,
       user.id,
       conversationId,
       encryptionKey,
       {
-        recordingType,
+        filename: `recording-${callId}-${Date.now()}`,
         mimeType,
-        durationSeconds,
       }
     );
 
-    console.log(`📹 Recording uploaded to S3: ${s3Key} (${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB)`);
+    console.log(`📹 Recording uploaded to S3: ${s3Result.s3Key} (${(fileSizeBytes / 1024 / 1024).toFixed(2)}MB)`);
 
     // 8. Create recording metadata in database
     const recordingId = await createRecordingMetadata(
       callId,
       user.id,
       conversationId,
-      s3Key,
+      s3Result.s3Key,
       mimeType,
       fileSizeBytes,
       durationSeconds,
@@ -157,14 +156,14 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown';
     await logRecordingAccess(recordingId, user.id, 'view', ipAddress, userAgent);
 
-    // 10. Generate presigned download URL (24 hours)
-    const downloadUrl = await generatePresignedDownloadUrl(s3Key, 86400);
+    // 10. Generate fresh presigned download URL (24 hours)
+    const downloadUrl = generatePresignedDownloadUrl(s3Result.s3Key, 86400);
     const expiresAtTimestamp = Date.now() + 86400 * 1000;
 
     const response = {
       success: true,
       recordingId,
-      s3Key,
+      s3Key: s3Result.s3Key,
       s3Url: downloadUrl,
       size: fileSizeBytes,
       uploadedAt: new Date().toISOString(),
