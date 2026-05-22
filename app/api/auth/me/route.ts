@@ -31,17 +31,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    // Fetch name + email from DB (JWT only carries userId/phoneNumber/orgId)
+    // Fetch profile fields from DB (JWT only carries userId/phoneNumber/orgId)
     let name: string | null = null;
     let email: string | null = null;
+    let language: string | null = null;
     try {
       const result = await query(
-        'SELECT name, email FROM users WHERE id = $1',
+        'SELECT name, email, language_preference FROM users WHERE id = $1',
         [decoded.userId]
       );
       if (result.rows[0]) {
         name = result.rows[0].name ?? null;
         email = result.rows[0].email ?? null;
+        language = result.rows[0].language_preference ?? null;
       }
     } catch {
       // Non-fatal — DB down or user not found; return without profile fields
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
         phoneNumber: decoded.phoneNumber,
         name,
         email,
+        language: language ?? 'en',
         orgId: decoded.orgId ?? null,
         isAdmin: checkSuperAdmin(decoded.phoneNumber),
       },

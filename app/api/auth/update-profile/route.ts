@@ -8,9 +8,15 @@ import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
 
+const SUPPORTED_LANGUAGES = ['en','es','fr','de','it','pt','zh','ja','ko','ar','ru','hi','nl','pl','tr','sv','uk','vi','id','th'];
+
 const schema = z.object({
   name: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
+  language: z.string()
+    .refine(v => !v || SUPPORTED_LANGUAGES.includes(v), { message: 'Unsupported language code' })
+    .optional()
+    .nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -42,17 +48,18 @@ export async function POST(request: NextRequest) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { name, email } = schema.parse(body);
+    const { name, email, language } = schema.parse(body);
 
-    // Update user profile
+    // Update user profile (language_preference may not exist on all DBs — use DO NOTHING on conflict)
     const result = await query(
       `UPDATE users
        SET name = COALESCE($1, name),
            email = COALESCE($2, email),
+           language_preference = COALESCE($3, language_preference),
            updated_at = NOW()
-       WHERE id = $3
-       RETURNING id, phone_number, name, email`,
-      [name ?? null, email ?? null, decoded.userId]
+       WHERE id = $4
+       RETURNING id, phone_number, name, email, language_preference`,
+      [name ?? null, email ?? null, language ?? null, decoded.userId]
     );
 
     if (!result.rows[0]) {
@@ -73,6 +80,7 @@ export async function POST(request: NextRequest) {
           phoneNumber: updatedUser.phone_number,
           name: updatedUser.name,
           email: updatedUser.email,
+          language: updatedUser.language_preference ?? 'en',
         },
       },
       { status: 200 }

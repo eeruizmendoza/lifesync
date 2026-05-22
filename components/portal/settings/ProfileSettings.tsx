@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, Save, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Save, Check, AlertCircle, Loader2, Globe } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -9,12 +9,37 @@ interface UserProfile {
   name: string | null;
   email: string | null;
   orgId: string | null;
+  language: string | null;
 }
+
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'zh', label: 'Chinese (Mandarin)' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'pl', label: 'Polish' },
+  { code: 'tr', label: 'Turkish' },
+  { code: 'sv', label: 'Swedish' },
+  { code: 'uk', label: 'Ukrainian' },
+  { code: 'vi', label: 'Vietnamese' },
+  { code: 'id', label: 'Indonesian' },
+  { code: 'th', label: 'Thai' },
+];
 
 export function ProfileSettings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [language, setLanguage] = useState('en');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -37,6 +62,7 @@ export function ProfileSettings() {
           setProfile(data.user);
           setName(data.user.name ?? '');
           setEmail(data.user.email ?? '');
+          setLanguage(data.user.language ?? 'en');
         }
       })
       .catch(() => setError('Failed to load profile'))
@@ -59,6 +85,7 @@ export function ProfileSettings() {
         body: JSON.stringify({
           name: name.trim() || null,
           email: email.trim() || null,
+          language: language || 'en',
         }),
       });
       const data = await res.json();
@@ -67,7 +94,7 @@ export function ProfileSettings() {
         return;
       }
       setSuccess(true);
-      setProfile(prev => prev ? { ...prev, name: data.user.name, email: data.user.email } : prev);
+      setProfile(prev => prev ? { ...prev, name: data.user.name, email: data.user.email, language: data.user.language } : prev);
       setTimeout(() => setSuccess(false), 3000);
     } catch {
       setError('Network error — please try again');
@@ -78,7 +105,8 @@ export function ProfileSettings() {
 
   const isDirty =
     name.trim() !== (profile?.name ?? '') ||
-    email.trim() !== (profile?.email ?? '');
+    email.trim() !== (profile?.email ?? '') ||
+    language !== (profile?.language ?? 'en');
 
   if (loading) {
     return (
@@ -147,6 +175,28 @@ export function ProfileSettings() {
           />
           <p className="mt-1.5 text-xs text-gray-400">
             Used for invite notifications and account recovery
+          </p>
+        </div>
+
+        {/* Preferred Language */}
+        <div className="px-6 py-5">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            <span className="flex items-center gap-2">
+              <Globe size={15} className="text-gray-400" />
+              Preferred Language
+            </span>
+          </label>
+          <select
+            value={language}
+            onChange={e => { setLanguage(e.target.value); setError(''); setSuccess(false); }}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-gray-900 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {LANGUAGES.map(lang => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-gray-400">
+            Your primary language for calls and translations
           </p>
         </div>
 
