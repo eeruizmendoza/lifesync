@@ -364,6 +364,91 @@ export async function incrementOrgCallCount(orgId: string): Promise<void> {
     UPDATE organizations SET calls_this_month = calls_this_month + 1, updated_at = NOW()
     WHERE id = ${orgId}::uuid
   `;
+  // Fire quota check asynchronously — non-blocking, non-fatal
+  notifyOrgQuotaIfNeeded(orgId).catch(() => {});
+}
+
+/**
+ * Check whether the org is approaching or has hit a quota threshold (80% / 100%).
+ * If so, insert a quota_warning notification for all org admins/owners — but only
+ * if no such notification was created in the last 6 hours to avoid spam.
+ */
+export async function notifyOrgQuotaIfNeeded(orgId: string): Promise<void> {
+  const sql = db();
+
+  const [org] = await sql`
+    SELECT
+      o.id,
+      o.name,
+      o.calls_this_month,
+      o.storage_used_bytes,
+      pl.max_calls_per_month,
+      pl.max_storage_bytes
+    FROM organizations o
+    JOIN plan_limits pl ON pl.plan = o.plan
+    WHERE o.id = ${orgId}::uuid
+  `;
+  if (!org) return;
+
+  const warnings: string[] = [];
+
+  // Calls threshold
+  if (org.max_calls_per_month > 0) {
+    const pct = org.calls_this_month / org.max_calls_per_month;
+    if (pct >= 1.0) {
+      warnings.push(`Your organization has reached its monthly call limit (${org.max_calls_per_month} calls). Upgrade to continue making calls.`);
+    } else if (pct >= 0.8) {
+      warnings.push(`Your organization has used ${Math.round(pct * 100)}% of its monthly call allowance (${org.calls_this_month} / ${org.max_calls_per_month} calls).`);
+    }
+  }
+
+  // Storage threshold
+  if (org.max_storage_bytes > 0) {
+    const pct = org.storage_used_bytes / org.max_storage_bytes;
+    if (pct >= 1.0) {
+      const usedGB = (org.storage_used_bytes / 1e9).toFixed(1);
+      const maxGB = (org.max_storage_bytes / 1e9).toFixed(0);
+      warnings.push(`Storage limit reached (${usedGB}GB / ${maxGB}GB). Upgrade your plan or delete old recordings.`);
+    } else if (pct >= 0.8) {
+      const usedPct = Math.round(pct * 100);
+      warnings.push(`You've used ${usedPct}% of your storage quota. Consider upgrading your plan.`);
+    }
+  }
+
+  if (warnings.length === 0) return;
+
+  // Dedup: skip if we already sent a quota_warning for this org in the last 6 hours
+  const [recent] = await sql`
+    SELECT 1 FROM user_notifications
+    WHERE org_id = ${orgId}::uuid
+      AND type = 'quota_warning'
+      AND created_at > NOW() - INTERVAL '6 hours'
+    LIMIT 1
+  `;
+  if (recent) return;
+
+  // Notify all admins and owners
+  const admins = await sql`
+    SELECT user_id FROM organization_members
+    WHERE org_id = ${orgId}::uuid
+      AND role IN ('admin', 'owner')
+  `;
+
+  for (const admin of admins) {
+    for (const msg of warnings) {
+      await sql`
+        INSERT INTO user_notifications (user_id, org_id, type, title, body, link)
+        VALUES (
+          ${admin.user_id}::uuid,
+          ${orgId}::uuid,
+          'quota_warning',
+          ${'⚠️ Usage limit approaching — ' + (org.name as string)},
+          ${msg},
+          '/billing'
+        )
+      `;
+    }
+  }
 }
 
 /** Update storage used (recalculated from call_recordings). */
