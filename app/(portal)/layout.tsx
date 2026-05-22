@@ -43,7 +43,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       credentials: 'include',
     })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => { setUser(data.user); setLoading(false); })
+      .then(data => {
+        setUser(data.user);
+        setLoading(false);
+        // Redirect to onboarding if user has no org and is not already there
+        if (!data.user?.orgId && !window.location.pathname.includes('/onboarding')) {
+          router.push('/onboarding');
+        }
+      })
       .catch(() => { router.push('/login'); });
   }, [router]);
 
