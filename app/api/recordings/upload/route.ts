@@ -176,6 +176,26 @@ export async function POST(request: NextRequest) {
     console.log(`   Duration: ${durationSeconds}s`);
     console.log(`   Download URL expires: ${new Date(expiresAtTimestamp).toISOString()}`);
 
+    // 11. Fire-and-forget: Trigger the processing job (integrity check + quality score + transcription)
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const sourceLanguage = body.sourceLanguage || 'en';
+    const targetLanguage = body.targetLanguage || 'en';
+    fetch(`${baseUrl}/api/jobs/process-recording`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-cron-secret': process.env.RESEARCH_PIPELINE_CRON_SECRET || '',
+      },
+      body: JSON.stringify({
+        recordingId,
+        encryptionKeyBase64,
+        sourceLanguage,
+        targetLanguage,
+      }),
+    }).catch((err) => {
+      console.error(`Failed to trigger process-recording job for ${recordingId}:`, err);
+    });
+
     return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error('Failed to upload recording:', error);

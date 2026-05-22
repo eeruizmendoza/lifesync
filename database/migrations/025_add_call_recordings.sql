@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS call_recording_encryption_keys (
   call_id VARCHAR(255) NOT NULL,
 
   -- Encrypted per-call key (encrypted with user's master key)
-  -- User stores master key in memory; we store derived per-call key encrypted
+  -- User stores master key in memory -- we store derived per-call key encrypted
   encrypted_key_material VARCHAR(1024) NOT NULL,
 
   -- Key derivation parameters
