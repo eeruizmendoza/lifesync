@@ -1,5 +1,5 @@
 import { Dashboard } from '@/components/portal/Dashboard';
-import { DashboardWidget } from '@/components/portal/DashboardWidget';
+import { DashboardWidget } from '@/components/portal/communications/DashboardWidget';
 
 export const dynamic = 'force-dynamic';
 
