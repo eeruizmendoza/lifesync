@@ -52,6 +52,12 @@ export async function GET(
 
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
 
+    // Fetch per-user metadata (tags, notes, company)
+    const [meta] = await sql`
+      SELECT tags, notes, company FROM contacts
+      WHERE user_id = ${user.id}::uuid AND contact_user_id = ${contactId}::uuid
+    `;
+
     // Fetch calls between authenticated user and this contact
     const calls = await sql`
       SELECT
@@ -98,6 +104,9 @@ export async function GET(
         language: contact.language ? String(contact.language) : null,
         avatarUrl: contact.avatar_url ? String(contact.avatar_url) : null,
         lastSeenAt: contact.last_seen_at ? new Date(String(contact.last_seen_at)).toISOString() : null,
+        tags: (meta?.tags as string[]) ?? [],
+        notes: meta?.notes ? String(meta.notes) : null,
+        company: meta?.company ? String(meta.company) : null,
       },
       calls: calls.map(c => ({
         id: String(c.id),
