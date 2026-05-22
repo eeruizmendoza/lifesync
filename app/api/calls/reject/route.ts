@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
+import { query } from '@/lib/db';
 
 interface RejectCallRequest {
   callId: string;
@@ -76,11 +77,18 @@ export async function POST(request: NextRequest) {
       rejectedAt: Date.now(),
     };
 
+    // Mark pending call as rejected so caller can detect it
+    try {
+      await query(
+        `UPDATE pending_calls SET status = 'rejected', rejected_at = NOW()
+         WHERE call_id = $1 AND receiver_id = $2::uuid AND status = 'ringing'`,
+        [callId, receiverId]
+      );
+    } catch { /* non-fatal */ }
+
     console.log(`❌ Call rejected: ${callId}`);
     console.log(`   Receiver: ${receiverId}`);
     console.log(`   Reason: ${reason}`);
-
-    // TODO: Send notification to caller that call was rejected
 
     return NextResponse.json(response, { status: 200 });
   } catch (error) {

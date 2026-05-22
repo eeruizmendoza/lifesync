@@ -151,6 +151,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch caller's display name for the notification
+    let callerDisplayName: string | null = null;
+    try {
+      const callerRow = await db.query(
+        'SELECT name, phone_number FROM users WHERE id = $1::uuid',
+        [caller.id]
+      );
+      callerDisplayName = callerRow.rows[0]?.name ?? null;
+    } catch { /* non-fatal */ }
+
     // Create conversation record in database
     try {
       const languagePair = `${sourceLanguage}_${targetLanguage}`;
@@ -176,6 +186,33 @@ export async function POST(request: NextRequest) {
     } catch (dbErr) {
       // Non-fatal — call still proceeds even if DB write fails
       console.error('[calls/initiate] Failed to create conversation record:', dbErr);
+    }
+
+    // Write pending call notification so receiver can poll for it
+    try {
+      await db.query(
+        `INSERT INTO pending_calls
+          (call_id, caller_id, receiver_id, source_language, target_language,
+           call_type, status, caller_name, caller_phone, org_id,
+           created_at, expires_at)
+         VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6, 'ringing', $7, $8, $9,
+                 NOW(), NOW() + INTERVAL '30 seconds')
+         ON CONFLICT (call_id) DO NOTHING`,
+        [
+          callId,
+          caller.id,
+          contactId,
+          sourceLanguage,
+          targetLanguage,
+          callType,
+          callerDisplayName,
+          contactPhone ?? null,
+          caller.orgId ?? null,
+        ]
+      );
+    } catch (pendingErr) {
+      // Non-fatal — call still proceeds
+      console.error('[calls/initiate] Failed to write pending call notification:', pendingErr);
     }
 
     // Prepare response

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthWithTestSupport } from '@/lib/auth-helper';
 import { getMediasoupSFU } from '@/lib/mediasoup-handler';
 import { getCallRegistry } from '@/lib/call-state-machine';
+import { query } from '@/lib/db';
 
 interface AcceptCallRequest {
   callId: string;
@@ -112,6 +113,15 @@ export async function POST(request: NextRequest) {
       },
       acceptedAt: Date.now(),
     };
+
+    // Mark pending call as answered so polling stops
+    try {
+      await query(
+        `UPDATE pending_calls SET status = 'answered', answered_at = NOW()
+         WHERE call_id = $1 AND receiver_id = $2::uuid AND status = 'ringing'`,
+        [callId, receiverId]
+      );
+    } catch { /* non-fatal */ }
 
     console.log(`✅ Call accepted: ${callId}`);
     console.log(`   Receiver: ${receiverId}`);

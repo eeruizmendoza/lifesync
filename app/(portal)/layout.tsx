@@ -18,6 +18,7 @@ import {
   Users,
   Cpu,
 } from 'lucide-react';
+import { IncomingCallBanner } from '@/components/portal/communications/IncomingCallBanner';
 
 interface User {
   id: string;
@@ -194,6 +195,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </button>
         </div>
       </aside>
+
+      {/* Incoming call notifications — visible on all portal pages */}
+      <IncomingCallBanner />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
